@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { createPaymentStatusMessage, getPaymentRow, getUser, sendPaymentEmails, triggerPaymentUpdate, upsertPaymentStatus } from "@/lib/payments/service";
-import { stripe, stripeWebhookSecret } from "@/lib/stripe";
+import { getStripeClient, getStripeWebhookSecret } from "@/lib/stripe";
 
 async function handlePaymentEvent(paymentIntent: { id: string; metadata?: Record<string, string> }) {
   const paymentId = paymentIntent.metadata?.paymentId ?? "";
@@ -43,6 +43,8 @@ async function handlePaymentEvent(paymentIntent: { id: string; metadata?: Record
 }
 
 export async function POST(request: Request) {
+  const stripeWebhookSecret = getStripeWebhookSecret();
+
   if (!stripeWebhookSecret) {
     return NextResponse.json({ error: "Falta STRIPE_WEBHOOK_SECRET" }, { status: 500 });
   }
@@ -57,7 +59,7 @@ export async function POST(request: Request) {
 
   try {
     const rawBody = await request.text();
-    event = stripe.webhooks.constructEvent(rawBody, signature, stripeWebhookSecret);
+    event = getStripeClient().webhooks.constructEvent(rawBody, signature, stripeWebhookSecret);
   } catch (error) {
     return NextResponse.json(
       {

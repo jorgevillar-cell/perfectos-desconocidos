@@ -8,14 +8,30 @@ function requireEnv(value: string | undefined, name: string) {
   return value;
 }
 
-export const stripeSecretKey = requireEnv(process.env.STRIPE_SECRET_KEY, "STRIPE_SECRET_KEY");
-export const stripePublishableKey = requireEnv(
-  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
-  "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY",
-);
-export const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET ?? "";
+let stripeClient: Stripe | null = null;
 
-export const stripe = new Stripe(stripeSecretKey);
+export function getStripeSecretKey() {
+  return requireEnv(process.env.STRIPE_SECRET_KEY, "STRIPE_SECRET_KEY");
+}
+
+export function getStripePublishableKey() {
+  return requireEnv(
+    process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
+    "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY",
+  );
+}
+
+export function getStripeWebhookSecret() {
+  return process.env.STRIPE_WEBHOOK_SECRET ?? "";
+}
+
+export function getStripeClient() {
+  if (!stripeClient) {
+    stripeClient = new Stripe(getStripeSecretKey());
+  }
+
+  return stripeClient;
+}
 
 export function platformFeeAmount(amount: number) {
   return Math.max(0, Math.round(amount * 0.1));

@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { PaymentCheckout } from "@/components/payments/payment-checkout";
 import { getCurrentUser } from "@/lib/auth/session";
 import { createPaymentIntentForPayment, getPaymentRow, getPiso, getUser } from "@/lib/payments/service";
-import { formatMoney, stripePublishableKey, stripeSecretKey } from "@/lib/stripe";
+import { formatMoney, getStripePublishableKey, getStripeSecretKey } from "@/lib/stripe";
 
 export default async function PaymentPage({
   params,
@@ -41,6 +41,8 @@ export default async function PaymentPage({
   }
 
   const amount = Number(payment.cantidad);
+  const stripeSecretKey = getStripeSecretKey();
+  const stripePublishableKey = getStripePublishableKey();
   const pisoImage = piso?.fotos?.[0] ?? "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=1200&q=80";
   const releaseDate = new Intl.DateTimeFormat("es-ES", {
     day: "2-digit",

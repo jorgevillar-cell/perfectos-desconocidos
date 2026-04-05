@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { createPaymentStatusMessage, getPaymentRow, getUser, settlePayment, triggerPaymentUpdate } from "@/lib/payments/service";
 import { sendNotificationEmail } from "@/lib/notifications/email";
-import { stripe } from "@/lib/stripe";
+import { getStripeClient } from "@/lib/stripe";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { supabase } from "@/lib/supabase";
 
@@ -72,11 +72,11 @@ export async function POST(request: Request) {
   }
 
   if (payment.stripePaymentIntentId) {
-    const intent = await stripe.paymentIntents.retrieve(payment.stripePaymentIntentId);
+    const intent = await getStripeClient().paymentIntents.retrieve(payment.stripePaymentIntentId);
     if (intent.status === "requires_capture" || intent.status === "requires_payment_method") {
-      await stripe.paymentIntents.cancel(payment.stripePaymentIntentId);
+      await getStripeClient().paymentIntents.cancel(payment.stripePaymentIntentId);
     } else {
-      await stripe.refunds.create({ payment_intent: payment.stripePaymentIntentId });
+      await getStripeClient().refunds.create({ payment_intent: payment.stripePaymentIntentId });
     }
   }
 

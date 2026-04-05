@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 import { pusherServer } from "@/lib/chat/pusher-server";
 import { sendNotificationEmail } from "@/lib/notifications/email";
 import { supabase } from "@/lib/supabase";
-import { formatMoney, ownerPayoutAmount, platformFeeAmount, stripe } from "@/lib/stripe";
+import { formatMoney, getStripeClient, ownerPayoutAmount, platformFeeAmount } from "@/lib/stripe";
 import type { ChatMessage } from "@/lib/chat/types";
 import type { IncidentStatus, PaymentMessagePayload, PaymentStatus, PaymentSummary } from "@/lib/payments/types";
 
@@ -196,7 +196,7 @@ export async function createConnectAccountLink(params: {
   }
 
   if (!user.stripeAccountId) {
-    const account = await stripe.accounts.create({
+    const account = await getStripeClient().accounts.create({
       type: "express",
       country: "ES",
       email: params.email,
@@ -229,7 +229,7 @@ export async function createConnectAccountLink(params: {
     throw new Error("No se pudo obtener la cuenta Stripe del usuario");
   }
 
-  const link = await stripe.accountLinks.create({
+  const link = await getStripeClient().accountLinks.create({
     account: user.stripeAccountId,
     refresh_url: params.refreshUrl,
     return_url: params.returnUrl,
@@ -254,7 +254,7 @@ export async function getConnectAccountStatus(userId: string) {
     };
   }
 
-  const account = await stripe.accounts.retrieve(user.stripeAccountId);
+  const account = await getStripeClient().accounts.retrieve(user.stripeAccountId);
 
   const currentlyDue = account.requirements?.currently_due?.length ?? 0;
   const disabledReason = account.requirements?.disabled_reason ?? null;
@@ -288,7 +288,7 @@ export async function createPaymentIntentForPayment(paymentId: string) {
   }
 
   if (payment.stripePaymentIntentId) {
-    const existing = await stripe.paymentIntents.retrieve(payment.stripePaymentIntentId);
+    const existing = await getStripeClient().paymentIntents.retrieve(payment.stripePaymentIntentId);
     return {
       payment: paymentFromRow(payment),
       clientSecret: existing.client_secret ?? null,
@@ -296,7 +296,7 @@ export async function createPaymentIntentForPayment(paymentId: string) {
   }
 
   const amount = Math.round(asNumber(payment.cantidad) * 100);
-  const intent = await stripe.paymentIntents.create({
+  const intent = await getStripeClient().paymentIntents.create({
     amount,
     currency: "eur",
     capture_method: "manual",
@@ -534,9 +534,9 @@ export async function settlePayment(paymentId: string) {
   }
 
   if (row.stripePaymentIntentId) {
-    const intent = await stripe.paymentIntents.retrieve(row.stripePaymentIntentId);
+    const intent = await getStripeClient().paymentIntents.retrieve(row.stripePaymentIntentId);
     if (intent.status === "requires_capture") {
-      await stripe.paymentIntents.capture(row.stripePaymentIntentId);
+      await getStripeClient().paymentIntents.capture(row.stripePaymentIntentId);
     }
   }
 
@@ -544,7 +544,7 @@ export async function settlePayment(paymentId: string) {
   const platformAmount = platformFeeAmount(payment.cantidad) * 100;
   const ownerAmount = Math.max(0, amount - platformAmount);
 
-  const transfer = await stripe.transfers.create({
+  const transfer = await getStripeClient().transfers.create({
     amount: ownerAmount,
     currency: "eur",
     destination: owner.stripeAccountId,
