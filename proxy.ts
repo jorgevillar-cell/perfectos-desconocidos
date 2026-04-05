@@ -3,19 +3,19 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { getPostLoginRedirectPath } from "@/lib/auth/onboarding";
 
-function requireEnv(value: string | undefined, name: string) {
-  if (!value) {
-    throw new Error(`Missing ${name} in environment variables`);
-  }
+function getSupabaseProxyConfig() {
+  const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+    process.env.SUPABASE_ANON_KEY ??
+    process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  return value;
+  return {
+    url,
+    key,
+    isConfigured: Boolean(url && key),
+  };
 }
-
-const supabaseUrl = requireEnv(process.env.SUPABASE_URL, "SUPABASE_URL");
-const supabaseServiceRoleKey = requireEnv(
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
-  "SUPABASE_SERVICE_ROLE_KEY",
-);
 
 function copyCookies(source: NextResponse, target: NextResponse) {
   source.cookies.getAll().forEach((cookie) => {
@@ -26,23 +26,6 @@ function copyCookies(source: NextResponse, target: NextResponse) {
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
-  const supabase = createServerClient(supabaseUrl, supabaseServiceRoleKey, {
-    cookies: {
-      getAll() {
-        return request.cookies.getAll();
-      },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value, options }) => {
-          response.cookies.set(name, value, options);
-        });
-      },
-    },
-  });
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
   const { pathname } = request.nextUrl;
   const isAuthPage = pathname === "/login" || pathname === "/register";
   const isProtectedPage =
@@ -51,11 +34,44 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/settings") ||
     pathname.startsWith("/payment");
 
-  if (isAuthPage && user) {
-    const destination = await getPostLoginRedirectPath(supabase, user.id);
-    const redirectResponse = NextResponse.redirect(new URL(destination, request.url));
-    copyCookies(response, redirectResponse);
-    return redirectResponse;
+  const supabaseConfig = getSupabaseProxyConfig();
+  if (!supabaseConfig.isConfigured) {
+    if (isProtectedPage) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+
+    return response;
+  }
+
+  let user: { id: string } | null = null;
+
+  try {
+    const supabase = createServerClient(supabaseConfig.url!, supabaseConfig.key!, {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            response.cookies.set(name, value, options);
+          });
+        },
+      },
+    });
+
+    const {
+      data: { user: currentUser },
+    } = await supabase.auth.getUser();
+    user = currentUser;
+
+    if (isAuthPage && user) {
+      const destination = await getPostLoginRedirectPath(supabase, user.id);
+      const redirectResponse = NextResponse.redirect(new URL(destination, request.url));
+      copyCookies(response, redirectResponse);
+      return redirectResponse;
+    }
+  } catch (error) {
+    console.error("Proxy auth check failed", error);
   }
 
   if (isProtectedPage && !user) {
