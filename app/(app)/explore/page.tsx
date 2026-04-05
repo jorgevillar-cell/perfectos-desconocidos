@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 import { getCurrentUser } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { ExploreScreen } from "@/components/explore/explore-screen";
+import { ExploreScreenEntry as ExploreScreen } from "@/components/explore/explore-screen-entry";
 import type { ExploreProfile } from "@/components/explore/explore-screen";
 import { getDemoProfiles } from "@/lib/explore/demo-profiles";
 import type { MatchCelebrationPayload } from "@/lib/chat/types";

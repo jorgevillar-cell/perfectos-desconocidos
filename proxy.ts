@@ -23,7 +23,7 @@ function copyCookies(source: NextResponse, target: NextResponse) {
   });
 }
 
-export async function proxy(request: NextRequest) {
+async function proxyHandler(request: NextRequest) {
   let response = NextResponse.next({ request });
 
   const { pathname } = request.nextUrl;
@@ -82,6 +82,9 @@ export async function proxy(request: NextRequest) {
 
   return response;
 }
+
+export { proxyHandler as proxy };
+export default proxyHandler;
 
 export const config = {
   matcher: ["/login", "/register", "/onboarding", "/explore", "/settings/:path*", "/payment/:path*", "/"],

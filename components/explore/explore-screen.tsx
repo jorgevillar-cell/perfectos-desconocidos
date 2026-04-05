@@ -6,7 +6,7 @@ import Link from "next/link";
 import { ChatDock } from "@/components/chat/chat-dock";
 import type { MatchCelebrationPayload } from "@/lib/chat/types";
 
-type ExploreProfile = {
+export type ExploreProfile = {
   id: string;
   nombre: string;
   edad: number;
@@ -29,7 +29,7 @@ type ExploreProfile = {
   badgeTags: [string, string, string];
 };
 
-type ExploreScreenProps = {
+export type ExploreScreenProps = {
   currentUserId: string;
   currentUserName: string;
   currentUserHasPiso: boolean;
@@ -650,5 +650,3 @@ export function ExploreScreen({
     </main>
   );
 }
-
-export type { ExploreProfile };
