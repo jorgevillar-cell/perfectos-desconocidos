@@ -1,0 +1,143 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                   String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email                String             @unique
+  nombre               String
+  edad                 Int
+  pais                 String
+  ciudad               String
+  idiomas              String[]
+  estadoCivil          String
+  fotoUrl              String?
+  bio                  String?
+  verificado           Boolean            @default(false)
+  stripeAccountId      String?            @unique
+  creadoEn             DateTime           @default(now())
+  perfilConvivencia    PerfilConvivencia?
+  pisos                Piso[]             @relation("PisoPropietario")
+  matchesComoUsuarioA  Match[]            @relation("MatchUsuarioA")
+  matchesComoUsuarioB  Match[]            @relation("MatchUsuarioB")
+  mensajes             Mensaje[]          @relation("MensajeRemitente")
+  pagosComoInquilino   Pago[]             @relation("PagoInquilino")
+  pagosComoPropietario Pago[]             @relation("PagoPropietario")
+
+  @@map("users")
+}
+
+model PerfilConvivencia {
+  userId          String   @id @db.Uuid
+  situacion       String
+  estudiaOTrabaja String
+  carrera         String?
+  universidad     String?
+  trabajo         String?
+  presupuesto     Decimal  @db.Decimal(10, 2)
+  zonas           String[]
+  fumar           Boolean
+  mascotas        Boolean
+  horario         String
+  ambiente        String
+  orden           String
+  deporte         String
+  aficiones       String[]
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("perfil_convivencia")
+}
+
+model Piso {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  propietarioId   String   @db.Uuid
+  precio          Decimal  @db.Decimal(10, 2)
+  zona            String
+  direccion       String?
+  descripcion     String
+  disponibleDesde DateTime @db.Date
+  fotos           String[]
+  gastosIncluidos Boolean
+  propietario     User     @relation("PisoPropietario", fields: [propietarioId], references: [id], onDelete: Cascade)
+
+  @@index([propietarioId])
+  @@map("pisos")
+}
+
+model Match {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  usuarioAId      String    @db.Uuid
+  usuarioBId      String    @db.Uuid
+  likeA           Boolean
+  likeB           Boolean
+  matchConfirmado Boolean
+  creadoEn        DateTime  @default(now())
+  usuarioA        User      @relation("MatchUsuarioA", fields: [usuarioAId], references: [id], onDelete: Cascade)
+  usuarioB        User      @relation("MatchUsuarioB", fields: [usuarioBId], references: [id], onDelete: Cascade)
+  mensajes        Mensaje[]
+  pagos           Pago[]
+
+  @@unique([usuarioAId, usuarioBId])
+  @@index([usuarioAId])
+  @@index([usuarioBId])
+  @@map("matches")
+}
+
+model Mensaje {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  matchId     String   @db.Uuid
+  remitenteId String   @db.Uuid
+  contenido   String
+  tipo        String   @default("text")
+  payload     Json?
+  leido       Boolean
+  creadoEn    DateTime @default(now())
+  match       Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  remitente   User     @relation("MensajeRemitente", fields: [remitenteId], references: [id], onDelete: Cascade)
+
+  @@index([matchId])
+  @@index([remitenteId])
+  @@map("mensajes")
+}
+
+model Pago {
+  id                    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  matchId               String       @db.Uuid
+  pisoId                String?      @db.Uuid
+  inquilinoId           String       @db.Uuid
+  propietarioId         String       @db.Uuid
+  cantidad              Decimal      @db.Decimal(10, 2)
+  estado                String
+  stripePaymentIntentId String?
+  liberadoEn            DateTime?
+  creadoEn              DateTime     @default(now())
+  match                 Match        @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  piso                  Piso?        @relation(fields: [pisoId], references: [id], onDelete: SetNull)
+  inquilino             User         @relation("PagoInquilino", fields: [inquilinoId], references: [id], onDelete: Cascade)
+  propietario           User         @relation("PagoPropietario", fields: [propietarioId], references: [id], onDelete: Cascade)
+  incidencias           Incidencia[]
+
+  @@index([matchId])
+  @@index([inquilinoId])
+  @@index([propietarioId])
+  @@map("pagos")
+}
+
+model Incidencia {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  pagoId      String   @db.Uuid
+  descripcion String
+  estado      String
+  fotos       String[]  @default([])
+  resolucion  String?
+  resueltaEn  DateTime?
+  creadoEn    DateTime @default(now())
+  pago        Pago     @relation(fields: [pagoId], references: [id], onDelete: Cascade)
+
+  @@index([pagoId])
+  @@map("incidencias")
+}
