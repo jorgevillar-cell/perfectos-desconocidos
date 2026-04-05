@@ -225,6 +225,10 @@ export async function createConnectAccountLink(params: {
     };
   }
 
+  if (!user.stripeAccountId) {
+    throw new Error("No se pudo obtener la cuenta Stripe del usuario");
+  }
+
   const link = await stripe.accountLinks.create({
     account: user.stripeAccountId,
     refresh_url: params.refreshUrl,
@@ -532,9 +536,7 @@ export async function settlePayment(paymentId: string) {
   if (row.stripePaymentIntentId) {
     const intent = await stripe.paymentIntents.retrieve(row.stripePaymentIntentId);
     if (intent.status === "requires_capture") {
-      await stripe.paymentIntents.capture(row.stripePaymentIntentId, {
-        transfer_group: payment.id,
-      });
+      await stripe.paymentIntents.capture(row.stripePaymentIntentId);
     }
   }
 

@@ -58,8 +58,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Solo el propietario puede crear solicitudes de pago" }, { status: 403 });
   }
 
-  const primaryPiso = pisoId ? await supabase.from("pisos").select("id,propietarioId,precio,zona,direccion,descripcion,fotos").eq("id", pisoId).maybeSingle() : await getPrimaryPisoForUser(user.id);
-  const piso = (primaryPiso.data ?? null) as {
+  const pisoFromId = pisoId
+    ? await supabase
+        .from("pisos")
+        .select("id,propietarioId,precio,zona,direccion,descripcion,fotos")
+        .eq("id", pisoId)
+        .maybeSingle<{
+          id: string;
+          propietarioId: string;
+          precio: number | string;
+          zona: string;
+          direccion: string | null;
+          descripcion: string;
+          fotos: string[];
+        }>()
+    : null;
+
+  const piso = (pisoFromId ? pisoFromId.data : await getPrimaryPisoForUser(user.id)) as {
     id: string;
     propietarioId: string;
     precio: number | string;
