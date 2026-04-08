@@ -71,8 +71,32 @@ const TEXT_PRIMARY = "#1A1A1A";
 const TEXT_SECONDARY = "#666666";
 const BG = "#FFFFFF";
 const APP_URL = process.env.NEXT_PUBLIC_SITE_URL ?? process.env.SITE_URL ?? "https://perfectos-desconocidos-5hgb.vercel.app";
-const EMAIL_FROM = process.env.EMAIL_FROM ?? "Perfectos Desconocidos onboarding@resend.dev";
+const EMAIL_FROM = process.env.EMAIL_FROM ?? "Perfectos Desconocidos <onboarding@resend.dev>";
 const UNSUBSCRIBE_URL = process.env.EMAIL_UNSUBSCRIBE_URL ?? `${APP_URL}/unsubscribe`;
+
+function serializeError(error: unknown) {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    };
+  }
+
+  try {
+    return JSON.parse(JSON.stringify(error));
+  } catch {
+    return { message: String(error) };
+  }
+}
+
+function logEmailError(context: string, error: unknown, meta?: Record<string, unknown>) {
+  console.error("[email:error]", {
+    context,
+    ...meta,
+    error: serializeError(error),
+  });
+}
 
 function getResendClient() {
   const apiKey = process.env.RESEND_API_KEY;
@@ -150,7 +174,11 @@ async function safeSend(payload: EmailPayload) {
       html: payload.html,
     });
   } catch (error) {
-    console.error("[email:error]", payload.subject, error);
+    logEmailError("safeSend", error, {
+      subject: payload.subject,
+      to: payload.to,
+      from: EMAIL_FROM,
+    });
   }
 }
 
@@ -204,7 +232,10 @@ export async function sendContactRequestEmail(payload: ContactRequestEmailPayloa
 
     await safeSend({ to: payload.to, subject, html });
   } catch (error) {
-    console.error("[email:error] sendContactRequestEmail", error);
+    logEmailError("sendContactRequestEmail", error, {
+      to: payload.to,
+      senderName: payload.senderName,
+    });
   }
 }
 
@@ -236,7 +267,10 @@ export async function sendContactAcceptedEmail(payload: ContactAcceptedEmailPayl
 
     await safeSend({ to: payload.to, subject, html });
   } catch (error) {
-    console.error("[email:error] sendContactAcceptedEmail", error);
+    logEmailError("sendContactAcceptedEmail", error, {
+      to: payload.to,
+      recipientName: payload.recipientName,
+    });
   }
 }
 
@@ -263,7 +297,10 @@ export async function sendContactRejectedEmail(payload: ContactRejectedEmailPayl
 
     await safeSend({ to: payload.to, subject, html });
   } catch (error) {
-    console.error("[email:error] sendContactRejectedEmail", error);
+    logEmailError("sendContactRejectedEmail", error, {
+      to: payload.to,
+      recipientName: payload.recipientName,
+    });
   }
 }
 
@@ -295,7 +332,10 @@ export async function sendWelcomeEmail(payload: WelcomeEmailPayload) {
 
     await safeSend({ to: payload.to, subject, html });
   } catch (error) {
-    console.error("[email:error] sendWelcomeEmail", error);
+    logEmailError("sendWelcomeEmail", error, {
+      to: payload.to,
+      name: payload.name,
+    });
   }
 }
 
@@ -328,7 +368,11 @@ export async function sendTenantPaymentSuccessEmail(payload: TenantPaymentSucces
 
     await safeSend({ to: payload.to, subject, html });
   } catch (error) {
-    console.error("[email:error] sendTenantPaymentSuccessEmail", error);
+    logEmailError("sendTenantPaymentSuccessEmail", error, {
+      to: payload.to,
+      ownerName: payload.ownerName,
+      paymentId: payload.payment.id,
+    });
   }
 }
 
@@ -357,7 +401,11 @@ export async function sendOwnerPaymentReceivedEmail(payload: OwnerPaymentReceive
 
     await safeSend({ to: payload.to, subject, html });
   } catch (error) {
-    console.error("[email:error] sendOwnerPaymentReceivedEmail", error);
+    logEmailError("sendOwnerPaymentReceivedEmail", error, {
+      to: payload.to,
+      tenantName: payload.tenantName,
+      paymentId: payload.payment.id,
+    });
   }
 }
 
@@ -388,6 +436,9 @@ export async function sendIncidentAlertEmail(payload: IncidentAlertEmailPayload)
 
     await safeSend({ to: payload.to, subject, html });
   } catch (error) {
-    console.error("[email:error] sendIncidentAlertEmail", error);
+    logEmailError("sendIncidentAlertEmail", error, {
+      to: payload.to,
+      paymentId: payload.paymentId,
+    });
   }
 }

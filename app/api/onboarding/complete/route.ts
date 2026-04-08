@@ -98,13 +98,6 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as Payload;
 
-    const { data: existingUser } = await supabase
-      .from("users")
-      .select("id")
-      .eq("id", user.id)
-      .maybeSingle<{ id: string }>();
-    const isFirstOnboarding = !existingUser;
-
     await ensureBucket();
 
     const profilePhotoUrl = await uploadDataUrl(
@@ -192,11 +185,26 @@ export async function POST(request: Request) {
       await supabase.from("pisos").delete().eq("propietarioId", user.id);
     }
 
-    if (isFirstOnboarding && user.email) {
-      await sendWelcomeEmail({
-        to: [user.email],
-        name: body.nombre,
-      });
+    if (user.email) {
+      try {
+        await sendWelcomeEmail({
+          to: [user.email],
+          name: body.nombre,
+        });
+      } catch (emailError) {
+        console.error("[onboarding:welcome-email:error]", {
+          userId: user.id,
+          email: user.email,
+          error:
+            emailError instanceof Error
+              ? {
+                  name: emailError.name,
+                  message: emailError.message,
+                  stack: emailError.stack,
+                }
+              : String(emailError),
+        });
+      }
     }
 
     return NextResponse.json({ ok: true });
