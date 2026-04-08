@@ -71,7 +71,7 @@ const TEXT_PRIMARY = "#1A1A1A";
 const TEXT_SECONDARY = "#666666";
 const BG = "#FFFFFF";
 const APP_URL = process.env.NEXT_PUBLIC_SITE_URL ?? process.env.SITE_URL ?? "https://perfectos-desconocidos-5hgb.vercel.app";
-const EMAIL_FROM = process.env.EMAIL_FROM ?? "Perfectos Desconocidos <onboarding@resend.dev>";
+const EMAIL_FROM = process.env.EMAIL_FROM ?? "Perfectos Desconocidos onboarding@resend.dev";
 const UNSUBSCRIBE_URL = process.env.EMAIL_UNSUBSCRIBE_URL ?? `${APP_URL}/unsubscribe`;
 
 function getResendClient() {

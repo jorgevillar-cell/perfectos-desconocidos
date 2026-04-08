@@ -178,6 +178,9 @@ export function ChatDock({
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [celebration, setCelebration] = useState<MatchCelebrationPayload | null>(initialCelebration ?? null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [deleteAccountError, setDeleteAccountError] = useState("");
   const [showPaymentRequestForm, setShowPaymentRequestForm] = useState(false);
 
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -326,6 +329,36 @@ export function ChatDock({
   const handleRequestCountChange = useCallback((count: number) => {
     setRequestBadgeCount(count);
   }, []);
+
+  const handleDeleteAccount = useCallback(async () => {
+    if (isDeletingAccount) {
+      return;
+    }
+
+    setIsDeletingAccount(true);
+    setDeleteAccountError("");
+
+    try {
+      const response = await fetch("/api/user/delete", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as { error?: string };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "No se pudo eliminar la cuenta");
+      }
+
+      window.location.assign(response.url || "/login");
+    } catch (error) {
+      setDeleteAccountError(error instanceof Error ? error.message : "No se pudo eliminar la cuenta");
+    } finally {
+      setIsDeletingAccount(false);
+    }
+  }, [isDeletingAccount]);
 
   const openChatFromRequest = useCallback(
     async ({
@@ -1123,24 +1156,66 @@ export function ChatDock({
                 onOpenChat={openChatFromRequest}
               />
             ) : (
-              <div className="flex h-full items-center justify-center px-8 text-center">
-                <div className="space-y-4">
-                  <p className="text-[20px] font-semibold text-[#1A1A1A]">
-                    {activePanel === "profile" ? "Perfil rapido" : activePanel === "notifications" ? "Notificaciones" : "Ajustes"}
-                  </p>
-                  <p className="text-[14px] text-[#6B7280]">{activePanel === "settings" ? "Gestiona tu cuenta de cobro desde la pantalla de pagos." : "Este panel queda preparado para conectarlo en la siguiente iteracion."}</p>
+                <div className="flex h-full items-center justify-center px-8 py-8 text-center">
+                  <div className="w-full max-w-md space-y-4">
+                    <p className="text-[20px] font-semibold text-[#1A1A1A]">
+                      {activePanel === "profile" ? "Perfil rapido" : activePanel === "notifications" ? "Notificaciones" : "Ajustes"}
+                    </p>
+                    <p className="text-[14px] text-[#6B7280]">
+                      {activePanel === "settings"
+                        ? "Gestiona tus pagos y la seguridad de tu cuenta desde este panel."
+                        : "Este panel queda preparado para conectarlo en la siguiente iteracion."}
+                    </p>
 
-                  {activePanel === "settings" ? (
-                    <Link
-                      href="/settings/payments"
-                      className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#FF6B6B] px-4 text-[14px] font-semibold text-white transition active:scale-[0.99]"
-                    >
-                      Ir a pagos
-                    </Link>
-                  ) : null}
+                    {activePanel === "settings" ? (
+                      <div className="space-y-4 text-left">
+                        <div className="rounded-3xl border border-[#E5E7EB] bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
+                          <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-[#9CA3AF]">Pagos</p>
+                          <p className="mt-2 text-[14px] leading-6 text-[#6B7280]">Gestiona tu cuenta bancaria, la verificación y el estado de cobros.</p>
+                          <Link
+                            href="/settings/payments"
+                            className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl bg-[#FF6B6B] px-4 text-[14px] font-semibold text-white transition active:scale-[0.99]"
+                          >
+                            Ir a pagos
+                          </Link>
+                        </div>
 
+                        <div className="rounded-3xl border border-[#E5E7EB] bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
+                          <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-[#9CA3AF]">Seguridad</p>
+                          <p className="mt-2 text-[14px] leading-6 text-[#6B7280]">Cierra sesión o elimina tu cuenta desde aquí.</p>
+
+                          <form action={logoutAction} className="mt-4">
+                            <button
+                              type="submit"
+                              className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-[#E5E7EB] bg-white px-4 text-[14px] font-semibold text-[#4B5563] transition hover:bg-[#F8F8F8] active:scale-[0.99]"
+                            >
+                              Cerrar sesión
+                            </button>
+                          </form>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDeleteAccountError("");
+                              setShowDeleteConfirm(true);
+                            }}
+                            className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#FECACA] bg-white px-4 text-[14px] font-semibold text-[#EF4444] transition hover:bg-[#FEF2F2] active:scale-[0.99]"
+                          >
+                            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                              <path d="M3 6h18" />
+                              <path d="M8 6V4h8v2" />
+                              <path d="M6 6l1 14h10l1-14" />
+                              <path d="M10 11v5" />
+                              <path d="M14 11v5" />
+                            </svg>
+                            Eliminar cuenta
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+
+                  </div>
                 </div>
-              </div>
             )}
           </div>
         ) : null}
@@ -1232,6 +1307,51 @@ export function ChatDock({
                   Confirmar
                 </button>
               </form>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showDeleteConfirm ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
+          <div className="w-full max-w-md rounded-3xl border border-white/60 bg-white p-6 text-center shadow-[0_24px_80px_rgba(0,0,0,0.18)]">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#FEF2F2] text-[#EF4444]">
+              <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M3 6h18" />
+                <path d="M8 6V4h8v2" />
+                <path d="M6 6l1 14h10l1-14" />
+                <path d="M10 11v5" />
+                <path d="M14 11v5" />
+              </svg>
+            </div>
+
+            <p className="mt-4 text-[20px] font-semibold text-[#1A1A1A]">Eliminar cuenta</p>
+            <p className="mt-2 text-[14px] leading-6 text-[#6B7280]">¿Estás seguro? Esta acción eliminará tu cuenta y todos tus datos permanentemente.</p>
+
+            {deleteAccountError ? <p className="mt-3 rounded-2xl border border-[#FECACA] bg-[#FEF2F2] px-4 py-3 text-[13px] font-medium text-[#B91C1C]">{deleteAccountError}</p> : null}
+
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  setDeleteAccountError("");
+                }}
+                disabled={isDeletingAccount}
+                className="min-h-12 rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-4 text-[14px] font-semibold text-[#4B5563] transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void handleDeleteAccount();
+                }}
+                disabled={isDeletingAccount}
+                className="min-h-12 rounded-xl bg-[#EF4444] px-4 text-[14px] font-semibold text-white transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isDeletingAccount ? "Eliminando..." : "Eliminar mi cuenta"}
+              </button>
             </div>
           </div>
         </div>
