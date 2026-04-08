@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { sendWelcomeEmail } from "@/lib/notifications/email";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { supabase } from "@/lib/supabase";
 
@@ -29,6 +30,10 @@ type Payload = {
   aficiones: string[];
 
   bio: string;
+  pisoPrecioAlquiler: number;
+  pisoDireccion: string;
+  pisoCompaneros: number;
+  pisoGastosIncluidos: boolean;
   pisoFotosDataUrls: string[];
   pisoDescripcion: string;
   telefono: string;
@@ -76,6 +81,10 @@ async function uploadDataUrl(path: string, dataUrl: string) {
   return data.publicUrl;
 }
 
+function serializePisoDescription(description: string, companeros: number) {
+  return `[PD_META_COMPANEROS:${companeros}]\n${description}`;
+}
+
 export async function POST(request: Request) {
   const authClient = await createSupabaseServerClient();
   const {
@@ -88,6 +97,13 @@ export async function POST(request: Request) {
 
   try {
     const body = (await request.json()) as Payload;
+
+    const { data: existingUser } = await supabase
+      .from("users")
+      .select("id")
+      .eq("id", user.id)
+      .maybeSingle<{ id: string }>();
+    const isFirstOnboarding = !existingUser;
 
     await ensureBucket();
 
@@ -155,20 +171,32 @@ export async function POST(request: Request) {
     }
 
     if (body.situacion === "tengo_piso_libre") {
+      await supabase.from("pisos").delete().eq("propietarioId", user.id);
+
       const pisoPayload = {
         propietarioId: user.id,
-        precio: body.presupuestoMax,
+        precio: body.pisoPrecioAlquiler,
         zona: body.zonas[0] ?? body.ciudad,
-        descripcion: body.pisoDescripcion,
+        direccion: body.pisoDireccion || null,
+        descripcion: serializePisoDescription(body.pisoDescripcion, body.pisoCompaneros),
         disponibleDesde: body.disponibleDesde || new Date().toISOString().slice(0, 10),
         fotos: pisoPhotoUrls,
-        gastosIncluidos: false,
+        gastosIncluidos: Boolean(body.pisoGastosIncluidos),
       };
 
       const { error: pisoError } = await supabase.from("pisos").insert(pisoPayload);
       if (pisoError) {
         throw new Error(pisoError.message);
       }
+    } else {
+      await supabase.from("pisos").delete().eq("propietarioId", user.id);
+    }
+
+    if (isFirstOnboarding && user.email) {
+      await sendWelcomeEmail({
+        to: [user.email],
+        name: body.nombre,
+      });
     }
 
     return NextResponse.json({ ok: true });

@@ -18,12 +18,19 @@ export async function POST(request: Request) {
   }
 
   const origin = request.headers.get("origin") ?? new URL(request.url).origin;
-  const { url, accountId } = await createConnectAccountLink({
-    userId: user.id,
-    email: user.email,
-    returnUrl: `${origin}/settings/payments?stripe=return`,
-    refreshUrl: `${origin}/settings/payments?stripe=refresh`,
-  });
+  try {
+    const { url, accountId } = await createConnectAccountLink({
+      userId: user.id,
+      email: user.email,
+      returnUrl: `${origin}/settings/payments?stripe=return`,
+      refreshUrl: `${origin}/settings/payments?stripe=refresh`,
+    });
 
-  return NextResponse.json({ ok: true, url, accountId });
+    return NextResponse.json({ ok: true, url, accountId });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "No se pudo crear el enlace de Stripe" },
+      { status: 400 },
+    );
+  }
 }

@@ -192,7 +192,7 @@ export async function createConnectAccountLink(params: {
 }) {
   let user = await getUser(params.userId);
   if (!user) {
-    throw new Error("Usuario no encontrado");
+    throw new Error("Completa tu onboarding antes de conectar pagos");
   }
 
   if (!user.stripeAccountId) {
@@ -243,7 +243,13 @@ export async function getConnectAccountStatus(userId: string) {
   const user = await getUser(userId);
 
   if (!user) {
-    throw new Error("Usuario no encontrado");
+    // The auth user can exist before onboarding persists the row in public.users.
+    // Keep the page usable and show a recoverable pending state instead of crashing.
+    return {
+      status: "pendiente" as const,
+      account: null,
+      user: null,
+    };
   }
 
   if (!user.stripeAccountId) {

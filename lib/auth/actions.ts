@@ -18,12 +18,27 @@ function getField(formData: FormData, key: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function getSafeNextPath(formData: FormData) {
+  const nextPath = getField(formData, "next");
+
+  if (!nextPath) {
+    return null;
+  }
+
+  if (!nextPath.startsWith("/") || nextPath.startsWith("//")) {
+    return null;
+  }
+
+  return nextPath;
+}
+
 export async function loginAction(
   _previousState: AuthFormState = initialState,
   formData: FormData,
 ): Promise<AuthFormState> {
   const email = getField(formData, "email");
   const password = getField(formData, "password");
+  const nextPath = getSafeNextPath(formData);
 
   if (!email || !password) {
     return { error: "Completa tu email y contraseña." };
@@ -44,6 +59,10 @@ export async function loginAction(
 
   if (!user) {
     return { error: "No se pudo recuperar tu usuario tras iniciar sesión." };
+  }
+
+  if (nextPath) {
+    redirect(nextPath);
   }
 
   const destination = await getPostLoginRedirectPath(supabase, user.id);

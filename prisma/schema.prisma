@@ -75,6 +75,10 @@ model Match {
   likeA           Boolean
   likeB           Boolean
   matchConfirmado Boolean
+  mensajePresentacion String? @db.VarChar(300)
+  estado          String    @default("solicitud_pendiente")
+  tokenAceptar    String?   @unique
+  fechaSolicitud   DateTime?
   creadoEn        DateTime  @default(now())
   usuarioA        User      @relation("MatchUsuarioA", fields: [usuarioAId], references: [id], onDelete: Cascade)
   usuarioB        User      @relation("MatchUsuarioB", fields: [usuarioBId], references: [id], onDelete: Cascade)

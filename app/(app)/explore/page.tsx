@@ -62,6 +62,7 @@ type BaseProfile = {
   universidad: string | null;
   situacion: string;
   estudiaOTrabaja: string;
+  esErasmus: boolean;
   fumar: boolean;
   mascotas: boolean;
   horario: string;
@@ -71,8 +72,22 @@ type BaseProfile = {
   presupuesto: number;
   tienePiso: boolean;
   precioPiso: number | null;
+  pisoDireccion: string | null;
+  pisoCompaneros: number | null;
+  pisoFotos: string[];
   fotoUrl: string;
 };
+
+function parseCompanerosFromDescription(description: string | null | undefined) {
+  const value = description ?? "";
+  const match = value.match(/\[PD_META_COMPANEROS:(\d+)\]/i);
+  if (!match) return null;
+  return Number(match[1] ?? "0") || null;
+}
+
+function stripMetaFromDescription(description: string | null | undefined) {
+  return (description ?? "").replace(/^\[PD_META_COMPANEROS:\d+\]\s*/i, "").trim();
+}
 
 function normalize(value: string | null | undefined) {
   return (value ?? "").trim().toLowerCase();
@@ -144,6 +159,10 @@ function fromDbToBase(user: DbUser): BaseProfile | null {
 
   const primaryPiso = user.pisos?.[0] ?? null;
 
+  const rawHobbies = profile.aficiones ?? [];
+  const esErasmus = rawHobbies.some((item) => normalize(item) === "erasmus");
+  const visibleHobbies = rawHobbies.filter((item) => normalize(item) !== "erasmus");
+
   return {
     id: user.id,
     nombre: user.nombre,
@@ -153,16 +172,20 @@ function fromDbToBase(user: DbUser): BaseProfile | null {
     universidad: profile.universidad,
     situacion: profile.situacion,
     estudiaOTrabaja: profile.estudiaOTrabaja,
+    esErasmus,
     fumar: profile.fumar,
     mascotas: profile.mascotas,
     horario: profile.horario,
     ambiente: profile.ambiente,
     deporte: profile.deporte,
-    aficiones: profile.aficiones ?? [],
+    aficiones: visibleHobbies,
     presupuesto: asNumber(profile.presupuesto),
     tienePiso: (user.pisos?.length ?? 0) > 0 || normalize(profile.situacion).includes("tengo_piso"),
     precioPiso: primaryPiso ? asNumber(primaryPiso.precio) : null,
-    fotoUrl: user.fotoUrl ?? "",
+    pisoDireccion: primaryPiso?.direccion ?? null,
+    pisoCompaneros: parseCompanerosFromDescription(primaryPiso?.descripcion),
+    pisoFotos: primaryPiso?.fotos ?? [],
+    fotoUrl: (primaryPiso?.fotos?.[0] ?? user.fotoUrl) ?? "",
   };
 }
 
@@ -190,6 +213,7 @@ function fallbackProfiles(city: string): ExploreProfile[] {
       universidad: profile.universidad,
       situacion: profile.situacion,
       estudiaOTrabaja: profile.estudiaOTrabaja,
+      esErasmus: profile.esErasmus,
       fumar: profile.fumar,
       mascotas: profile.mascotas,
       horario: profile.horario,
@@ -199,6 +223,9 @@ function fallbackProfiles(city: string): ExploreProfile[] {
       presupuesto: profile.presupuesto,
       tienePiso: profile.tienePiso,
       precioPiso: profile.precioPiso,
+      pisoDireccion: profile.pisos[0]?.direccion ?? null,
+      pisoCompaneros: parseCompanerosFromDescription(profile.pisos[0]?.descripcion ?? null),
+      pisoFotos: profile.pisos[0]?.fotos ?? [],
       fotoUrl: profile.fotoUrl,
     };
 

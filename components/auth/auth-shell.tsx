@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BrandLogo } from "@/components/brand-logo";
 
 type AuthShellProps = {
   title: string;
@@ -48,9 +49,8 @@ export function AuthShell({
         <div className="mx-auto grid min-h-screen max-w-6xl px-5 py-6 lg:grid-cols-[1.1fr_0.9fr] lg:px-10 lg:py-10">
           <main className="flex items-center py-6 lg:py-12">
             <div className="w-full max-w-xl">
-              <div className="inline-flex items-center gap-3 rounded-full border border-white/80 bg-white/90 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm shadow-black/5">
-                <span className="h-3 w-3 rounded-full bg-[#FF6B6B]" />
-                Perfectos Desconocidos
+              <div className="inline-flex items-center rounded-full border border-white/80 bg-white/90 px-4 py-2 shadow-sm shadow-black/5">
+                <BrandLogo className="h-16 w-auto" />
               </div>
 
               <h1 className="mt-8 max-w-lg text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl">

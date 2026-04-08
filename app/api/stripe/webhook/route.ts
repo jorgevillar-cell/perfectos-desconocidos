@@ -1,9 +1,26 @@
 import { NextResponse } from "next/server";
 
-import { createPaymentStatusMessage, getPaymentRow, getUser, sendPaymentEmails, triggerPaymentUpdate, upsertPaymentStatus } from "@/lib/payments/service";
+import { sendOwnerPaymentReceivedEmail, sendTenantPaymentSuccessEmail } from "@/lib/notifications/email";
+import { createPaymentStatusMessage, getPaymentRow, getPiso, getUser, triggerPaymentUpdate, upsertPaymentStatus } from "@/lib/payments/service";
 import { getStripeClient, getStripeWebhookSecret } from "@/lib/stripe";
 
-async function handlePaymentEvent(paymentIntent: { id: string; metadata?: Record<string, string> }) {
+function getAppUrl() {
+  return process.env.NEXT_PUBLIC_SITE_URL ?? process.env.SITE_URL ?? "https://perfectos-desconocidos-5hgb.vercel.app";
+}
+
+function formatReleaseDate(createdAt: string) {
+  const releaseDate = new Date(new Date(createdAt).getTime() + 7 * 24 * 60 * 60 * 1000);
+  return new Intl.DateTimeFormat("es-ES", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  }).format(releaseDate);
+}
+
+async function handlePaymentEvent(
+  paymentIntent: { id: string; metadata?: Record<string, string> },
+  sendEmails: boolean,
+) {
   const paymentId = paymentIntent.metadata?.paymentId ?? "";
   if (!paymentId) {
     return;
@@ -19,9 +36,15 @@ async function handlePaymentEvent(paymentIntent: { id: string; metadata?: Record
     return;
   }
 
-  const [buyer, owner] = await Promise.all([getUser(payment.inquilinoId), getUser(payment.propietarioId)]);
+  const [buyer, owner, piso] = await Promise.all([
+    getUser(payment.inquilinoId),
+    getUser(payment.propietarioId),
+    payment.pisoId ? getPiso(payment.pisoId) : Promise.resolve(null),
+  ]);
+  const releaseDateLabel = formatReleaseDate(payment.creadoEn);
+  const propertyAddress = piso?.direccion ?? piso?.zona ?? "Piso publicado en Perfectos Desconocidos";
 
-  await Promise.all([
+  const tasks: Array<Promise<unknown>> = [
     triggerPaymentUpdate(updated, payment.matchId),
     createPaymentStatusMessage({
       matchId: payment.matchId,
@@ -31,15 +54,31 @@ async function handlePaymentEvent(paymentIntent: { id: string; metadata?: Record
       status: "pagado",
       note: "Pago confirmado. Queda en custodia 48h.",
     }),
-    buyer && owner
-      ? sendPaymentEmails({
-          buyerEmail: buyer.email,
-          ownerEmail: owner.email,
-          subject: "Pago confirmado",
-          payment: updated,
-        })
-      : Promise.resolve(),
-  ]);
+  ];
+
+  if (sendEmails && buyer && owner) {
+    tasks.push(
+      sendTenantPaymentSuccessEmail({
+        to: [buyer.email],
+        payment: updated,
+        ownerName: owner.nombre,
+        propertyAddress,
+        releaseDateLabel,
+        paymentUrl: `${getAppUrl()}/payment/${updated.id}`,
+      }),
+    );
+    tasks.push(
+      sendOwnerPaymentReceivedEmail({
+        to: [owner.email],
+        tenantName: buyer.nombre,
+        payment: updated,
+        releaseDateLabel,
+        detailsUrl: `${getAppUrl()}/payment/success/${updated.id}`,
+      }),
+    );
+  }
+
+  await Promise.all(tasks);
 }
 
 export async function POST(request: Request) {
@@ -71,7 +110,10 @@ export async function POST(request: Request) {
 
   try {
     if (event.type === "payment_intent.amount_capturable_updated" || event.type === "payment_intent.succeeded") {
-      await handlePaymentEvent(event.data.object as { id: string; metadata?: Record<string, string> });
+      await handlePaymentEvent(
+        event.data.object as { id: string; metadata?: Record<string, string> },
+        event.type === "payment_intent.succeeded",
+      );
     }
 
     if (event.type === "payment_intent.payment_failed") {

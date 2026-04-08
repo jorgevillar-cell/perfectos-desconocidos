@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { BrandLogo } from "@/components/brand-logo";
+import { ChipList, FooterActions, RadioGroup, SectionCard, SelectField, StepHeader, ToggleGroup } from "@/components/onboarding/onboarding-structure";
 
 type Props = {
   userId: string;
@@ -17,6 +19,17 @@ type Ambiente = "tranquilo" | "equilibrado" | "social" | "";
 type Deporte = "poco" | "algunas" | "frecuente" | "";
 type EstadoCivil = "soltero" | "pareja" | "prefiero_no_decir" | "";
 
+type CitySuggestion = {
+  id: string;
+  city: string;
+  label: string;
+};
+
+type ZoneSuggestion = {
+  id: string;
+  label: string;
+};
+
 type OnboardingData = {
   nombre: string;
   edad: number | "";
@@ -28,6 +41,7 @@ type OnboardingData = {
 
   situacion: Situacion;
   estudiaOTrabaja: EstudioTrabajo;
+  esErasmus: boolean;
   carrera: string;
   universidad: string;
   trabajo: string;
@@ -38,11 +52,18 @@ type OnboardingData = {
   fumar: Fumar;
   mascotas: Mascotas;
   horario: Horario;
+  horarioPersonal: string;
   ambiente: Ambiente;
   deporte: Deporte;
   aficiones: string[];
 
   bio: string;
+  pisoCiudad: string;
+  pisoCalle: string;
+  pisoPrecioAlquiler: number;
+  pisoDireccion: string;
+  pisoCompaneros: number;
+  pisoGastosIncluidos: boolean;
   pisoFotosDataUrls: string[];
   pisoDescripcion: string;
   telefono: string;
@@ -54,15 +75,14 @@ type OnboardingData = {
 const STORAGE_KEY_PREFIX = "pd_onboarding_v1";
 
 const LANG_OPTIONS = [
-  "espanol",
-  "ingles",
-  "frances",
-  "aleman",
-  "italiano",
-  "portugues",
-  "chino",
-  "arabe",
-  "otros",
+  { code: "es", label: "Español" },
+  { code: "en", label: "Inglés" },
+  { code: "fr", label: "Francés" },
+  { code: "de", label: "Alemán" },
+  { code: "it", label: "italiano" },
+  { code: "pt", label: "Portugués" },
+  { code: "zh", label: "Chino" },
+  { code: "ar", label: "Árabe" },
 ] as const;
 
 const CITIES = [
@@ -94,24 +114,94 @@ const CITY_ZONES: Record<string, string[]> = {
   Valencia: ["Ruzafa", "Benimaclet", "El Carmen", "Campanar", "Patraix", "Malvarrosa"],
   Sevilla: ["Triana", "Nervion", "Centro", "Los Remedios", "Macarena"],
   Malaga: ["Centro", "Teatinos", "El Palo", "Pedregalejo", "Huelin"],
+  Bilbao: ["Abando", "Casco Viejo", "Deusto", "Indautxu", "Santutxu", "Basurto"],
+  Zaragoza: ["Centro", "Delicias", "Universidad", "Actur", "Casco Historico", "La Almozara"],
+  Murcia: ["Centro", "La Flota", "Santa Maria de Gracia", "Vistabella", "El Carmen", "Espinardo"],
+  Palma: ["Santa Catalina", "Son Armadans", "El Terreno", "Pere Garau", "Foners", "Centro"],
+  Alicante: ["Centro", "San Blas", "Benalua", "Carolinas", "Playa de San Juan", "Albufereta"],
+  Granada: ["Centro", "Realejo", "Zaidin", "Albaicin", "Chana", "Cartuja"],
+  Valladolid: ["Centro", "Parquesol", "Delicias", "La Rubia", "Huerta del Rey", "Rondilla"],
+  Vigo: ["Casco Vello", "Coia", "Teis", "Navia", "Calvario", "Bouzas"],
+  Gijon: ["Centro", "La Arena", "El Coto", "Viesques", "Pumarin", "Natahoyo"],
+  "A Coruna": ["Ciudad Vieja", "Monte Alto", "Riazor", "Os Mallos", "Cuatro Caminos", "Matogrande"],
+  Cordoba: ["Centro", "Ciudad Jardin", "Levante", "Huerta de la Reina", "Brillante", "Figueroa"],
+  Santander: ["Centro", "Puertochico", "Sardinero", "Cueto", "Castilla-Hermida", "Cazoña"],
+  Donostia: ["Centro", "Gros", "Amara", "Antiguo", "Egia", "Intxaurrondo"],
+  Salamanca: ["Centro", "Garrido", "San Bernardo", "Pizarrales", "Prosperidad", "Tejares"],
+  "Las Palmas": ["Triana", "Vegueta", "Guanarteme", "Alcaravaneras", "Schamann", "La Isleta"],
 };
 
 const UNIVERSIDADES = [
-  "Universidad Complutense de Madrid",
-  "Universidad Autonoma de Madrid",
+  "Universidad de Alcalá",
+  "Universidad Alfonso X el Sabio",
+  "Universidad Antonio de Nebrija",
+  "Universidad Camilo José Cela",
   "Universidad Carlos III de Madrid",
+  "Universidad Complutense de Madrid",
+  "Universidad de Deusto",
+  "Universidad Europea de Madrid",
+  "Universidad Francisco de Vitoria",
+  "Universidad Internacional de La Rioja",
+  "Universidad Loyola",
+  "Universidad Nacional de Educación a Distancia",
+  "Universidad Pontificia Comillas",
+  "Universidad Rey Juan Carlos",
+  "Universidad San Pablo CEU",
+  "Universidad Villanueva",
+  "Universidad Autonoma de Madrid",
   "Universidad Politecnica de Madrid",
+  "Universidad de Alicante",
+  "Universidad de Almería",
+  "Universidad de Burgos",
+  "Universidad de Cádiz",
+  "Universidad de Cantabria",
+  "Universidad de Castilla-La Mancha",
+  "Universidad de Córdoba",
+  "Universidad de Extremadura",
+  "Universidad de Girona",
+  "Universidad de Huelva",
+  "Universidad de Jaén",
+  "Universidad de La Laguna",
+  "Universidad de La Rioja",
+  "Universidad de Las Palmas de Gran Canaria",
+  "Universidad de León",
+  "Universidad de Lleida",
+  "Universidad de Navarra",
+  "Universidad de Oviedo",
+  "Universidad de Salamanca",
+  "Universidad de Santiago de Compostela",
+  "Universidad de Vigo",
+  "Universidad de Zaragoza",
   "Universidad de Barcelona",
+  "Universidad de Burgos",
+  "Universidad de Cádiz",
+  "Universidad de Castilla-La Mancha",
+  "Universidad de Córdoba",
+  "Universidad de Granada",
+  "Universidad de Jaén",
+  "Universidad de León",
+  "Universidad de Murcia",
+  "Universidad de Sevilla",
   "Universitat Autonoma de Barcelona",
+  "Universitat Abat Oliba CEU",
+  "Universitat de Girona",
+  "Universitat de Lleida",
+  "Universitat de Vic",
+  "Universitat de les Illes Balears",
+  "Universitat de Valencia",
+  "Universitat Internacional de Catalunya",
+  "Universitat Jaume I",
+  "Universitat Oberta de Catalunya",
+  "Universitat Ramon Llull",
+  "Universitat Rovira i Virgili",
   "Universitat Pompeu Fabra",
   "Universitat Politecnica de Valencia",
-  "Universidad de Valencia",
-  "Universidad de Sevilla",
   "Universidad de Malaga",
-  "Universidad de Granada",
   "Universidad del Pais Vasco",
-  "Universidad de Zaragoza",
-  "Universidad de Murcia",
+  "Universidad Miguel Hernandez de Elche",
+  "Universidad Pablo de Olavide",
+  "Universidad Politécnica de Cartagena",
+  "Universidad Pública de Navarra",
 ];
 
 const COUNTRIES = [
@@ -144,6 +234,7 @@ const initialData: OnboardingData = {
 
   situacion: "",
   estudiaOTrabaja: "",
+  esErasmus: false,
   carrera: "",
   universidad: "",
   trabajo: "",
@@ -154,11 +245,18 @@ const initialData: OnboardingData = {
   fumar: "",
   mascotas: "",
   horario: "",
+  horarioPersonal: "",
   ambiente: "",
   deporte: "",
   aficiones: [],
 
   bio: "",
+  pisoCiudad: "",
+  pisoCalle: "",
+  pisoPrecioAlquiler: 650,
+  pisoDireccion: "",
+  pisoCompaneros: 1,
+  pisoGastosIncluidos: false,
   pisoFotosDataUrls: [],
   pisoDescripcion: "",
   telefono: "",
@@ -174,10 +272,10 @@ function stepLabel(step: number) {
 function cardClass(selected: boolean, error?: boolean) {
   return `min-h-12 w-full rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition ${
     selected
-      ? "border-[#FF6B6B] bg-[#FF6B6B]/10 text-[#d54848]"
+      ? "border-black/25 bg-white text-slate-800 shadow-[0_4px_14px_rgba(0,0,0,0.08)]"
       : error
       ? "border-rose-300 bg-rose-50 text-rose-700"
-      : "border-slate-200 bg-white text-slate-700 hover:border-[#FF6B6B]/40"
+      : "border-black/10 bg-white text-slate-700 hover:border-black/20"
   }`;
 }
 
@@ -185,8 +283,36 @@ function fieldClass(error?: boolean) {
   return `h-12 w-full rounded-2xl border bg-white px-4 text-base outline-none transition focus:ring-4 ${
     error
       ? "border-rose-400 focus:border-rose-500 focus:ring-rose-100"
-      : "border-slate-200 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/12"
+      : "border-black/10 focus:border-black/25 focus:ring-black/5"
   }`;
+}
+
+function normalizeForSearch(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function formatLanguageLabel(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return trimmed;
+  return `${trimmed.charAt(0).toLocaleUpperCase("es-ES")}${trimmed.slice(1)}`;
+}
+
+function clampBudget(value: number) {
+  if (Number.isNaN(value)) return 200;
+  return Math.min(5000, Math.max(200, value));
+}
+
+function parseBudgetInput(value: string) {
+  const numeric = Number(value.replace(/[^0-9]/g, ""));
+  return clampBudget(numeric);
+}
+
+function parseMoneyInput(value: string) {
+  const numeric = Number(value.replace(/[^0-9]/g, ""));
+  return Number.isNaN(numeric) ? 0 : Math.min(5000, Math.max(0, numeric));
 }
 
 async function toDataUrl(file: File) {
@@ -215,14 +341,46 @@ function dataUrlToFile(dataUrl: string, fileName: string) {
 export function OnboardingFlow({ userId, email }: Props) {
   const router = useRouter();
   const storageKey = `${STORAGE_KEY_PREFIX}:${userId}`;
+  const countryMenuRef = useRef<HTMLDivElement | null>(null);
+  const cityMenuRef = useRef<HTMLDivElement | null>(null);
+  const pisoCityMenuRef = useRef<HTMLDivElement | null>(null);
+  const pisoStreetMenuRef = useRef<HTMLDivElement | null>(null);
+  const universityMenuRef = useRef<HTMLDivElement | null>(null);
+  const zonesMenuRef = useRef<HTMLDivElement | null>(null);
+  const languageMenuRef = useRef<HTMLDivElement | null>(null);
 
   const [step, setStep] = useState(1);
   const [animating, setAnimating] = useState(false);
   const [data, setData] = useState<OnboardingData>(initialData);
+  const [budgetDraft, setBudgetDraft] = useState(String(initialData.presupuestoMax));
+  const [pisoPrecioDraft, setPisoPrecioDraft] = useState(String(initialData.pisoPrecioAlquiler));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [isPisoFotosUploading, setIsPisoFotosUploading] = useState(false);
   const [globalError, setGlobalError] = useState("");
   const [smsFeedback, setSmsFeedback] = useState("");
+  const [countryMenuOpen, setCountryMenuOpen] = useState(false);
+  const [countryQuery, setCountryQuery] = useState("");
+  const [cityMenuOpen, setCityMenuOpen] = useState(false);
+  const [citySuggestions, setCitySuggestions] = useState<CitySuggestion[]>([]);
+  const [isLoadingCities, setIsLoadingCities] = useState(false);
+  const [pisoCityMenuOpen, setPisoCityMenuOpen] = useState(false);
+  const [pisoCityQuery, setPisoCityQuery] = useState("");
+  const [pisoCitySuggestions, setPisoCitySuggestions] = useState<CitySuggestion[]>([]);
+  const [isLoadingPisoCities, setIsLoadingPisoCities] = useState(false);
+  const [pisoStreetMenuOpen, setPisoStreetMenuOpen] = useState(false);
+  const [pisoStreetQuery, setPisoStreetQuery] = useState("");
+  const [pisoStreetSuggestions, setPisoStreetSuggestions] = useState<CitySuggestion[]>([]);
+  const [isLoadingPisoStreets, setIsLoadingPisoStreets] = useState(false);
+  const [universityMenuOpen, setUniversityMenuOpen] = useState(false);
+  const [universityQuery, setUniversityQuery] = useState("");
+  const [zonesMenuOpen, setZonesMenuOpen] = useState(false);
+  const [zonesQuery, setZonesQuery] = useState("");
+  const [zoneSuggestions, setZoneSuggestions] = useState<ZoneSuggestion[]>([]);
+  const [isLoadingZones, setIsLoadingZones] = useState(false);
+  const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
+  const [languageQuery, setLanguageQuery] = useState("");
+  const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
   useEffect(() => {
     const saved = localStorage.getItem(storageKey);
@@ -245,19 +403,492 @@ export function OnboardingFlow({ userId, email }: Props) {
     localStorage.setItem(storageKey, JSON.stringify({ step, data }));
   }, [data, step, storageKey]);
 
+  useEffect(() => {
+    setBudgetDraft(String(data.presupuestoMax || ""));
+  }, [data.presupuestoMax]);
+
+  useEffect(() => {
+    setPisoPrecioDraft(String(data.pisoPrecioAlquiler || ""));
+  }, [data.pisoPrecioAlquiler]);
+
   const zonasDisponibles = useMemo(() => {
+    if (zoneSuggestions.length) {
+      return zoneSuggestions.map((item) => item.label);
+    }
+
     return CITY_ZONES[data.ciudad] ?? [];
-  }, [data.ciudad]);
+  }, [data.ciudad, zoneSuggestions]);
 
-  const ciudadSugerencias = useMemo(() => {
-    if (!data.ciudad) return CITIES;
-    return CITIES.filter((city) => city.toLowerCase().includes(data.ciudad.toLowerCase()));
-  }, [data.ciudad]);
+  const allCountries = useMemo(() => [...COUNTRIES].sort((a, b) => a.localeCompare(b, "es")), []);
 
-  const paisSugerencias = useMemo(() => {
-    if (!data.pais) return COUNTRIES.slice(0, 20);
-    return COUNTRIES.filter((country) => country.toLowerCase().includes(data.pais.toLowerCase())).slice(0, 20);
-  }, [data.pais]);
+  const filteredCountries = useMemo(() => {
+    const search = normalizeForSearch(countryQuery.trim());
+    if (!search) {
+      return allCountries;
+    }
+
+    return allCountries.filter((country) => normalizeForSearch(country).includes(search));
+  }, [allCountries, countryQuery]);
+
+  const allLanguageOptions = useMemo(() => {
+    try {
+      if (typeof Intl.supportedValuesOf === "function") {
+        const displayNames = new Intl.DisplayNames(["es"], { type: "language" });
+        const values = (Intl.supportedValuesOf as (key: string) => string[])("language")
+          .filter((code) => /^[a-z]{2,3}$/i.test(code))
+          .map((code) => {
+            const normalized = code.toLowerCase();
+            const label = displayNames.of(normalized) ?? normalized;
+            return {
+              code: normalized,
+              label: formatLanguageLabel(label),
+            };
+          })
+          .filter((item) => item.label && item.label !== item.code);
+
+        const unique = new Map<string, { code: string; label: string }>();
+        for (const item of values) {
+          const dedupeKey = normalizeForSearch(item.label);
+          if (!unique.has(dedupeKey)) {
+            unique.set(dedupeKey, item);
+          }
+        }
+
+        const merged = [...LANG_OPTIONS, ...Array.from(unique.values())];
+        const byLabel = new Map<string, { code: string; label: string }>();
+        for (const item of merged) {
+          byLabel.set(item.label, item);
+        }
+
+        return Array.from(byLabel.values()).sort((a, b) => a.label.localeCompare(b.label, "es"));
+      }
+    } catch {
+      // Ignore and fallback to static options.
+    }
+
+    return [...LANG_OPTIONS].sort((a, b) => a.label.localeCompare(b.label, "es"));
+  }, []);
+
+  const filteredLanguageOptions = useMemo(() => {
+    const search = normalizeForSearch(languageQuery.trim());
+    if (!search) {
+      return allLanguageOptions;
+    }
+
+    return allLanguageOptions.filter((item) => normalizeForSearch(item.label).includes(search));
+  }, [allLanguageOptions, languageQuery]);
+
+  const allUniversityOptions = useMemo(
+    () => Array.from(new Set(UNIVERSIDADES)).sort((a, b) => a.localeCompare(b, "es")),
+    [],
+  );
+
+  const filteredUniversityOptions = useMemo(() => {
+    const search = normalizeForSearch(universityQuery.trim());
+    if (!search) {
+      return allUniversityOptions;
+    }
+
+    return allUniversityOptions.filter((uni) => normalizeForSearch(uni).includes(search));
+  }, [allUniversityOptions, universityQuery]);
+
+  const filteredZones = useMemo(() => {
+    const search = normalizeForSearch(zonesQuery.trim());
+    if (!search) {
+      return zonasDisponibles;
+    }
+
+    return zonasDisponibles.filter((zone) => normalizeForSearch(zone).includes(search));
+  }, [zonasDisponibles, zonesQuery]);
+
+  useEffect(() => {
+    function handleCountryOutsideClick(event: MouseEvent) {
+      if (!countryMenuRef.current) return;
+      if (countryMenuRef.current.contains(event.target as Node)) return;
+      setCountryMenuOpen(false);
+    }
+
+    document.addEventListener("mousedown", handleCountryOutsideClick);
+    return () => document.removeEventListener("mousedown", handleCountryOutsideClick);
+  }, []);
+
+  useEffect(() => {
+    function handleCityOutsideClick(event: MouseEvent) {
+      if (!cityMenuRef.current) return;
+      if (cityMenuRef.current.contains(event.target as Node)) return;
+      setCityMenuOpen(false);
+    }
+
+    document.addEventListener("mousedown", handleCityOutsideClick);
+    return () => document.removeEventListener("mousedown", handleCityOutsideClick);
+  }, []);
+
+  useEffect(() => {
+    function handlePisoCityOutsideClick(event: MouseEvent) {
+      if (!pisoCityMenuRef.current) return;
+      if (pisoCityMenuRef.current.contains(event.target as Node)) return;
+      setPisoCityMenuOpen(false);
+    }
+
+    document.addEventListener("mousedown", handlePisoCityOutsideClick);
+    return () => document.removeEventListener("mousedown", handlePisoCityOutsideClick);
+  }, []);
+
+  useEffect(() => {
+    function handlePisoStreetOutsideClick(event: MouseEvent) {
+      if (!pisoStreetMenuRef.current) return;
+      if (pisoStreetMenuRef.current.contains(event.target as Node)) return;
+      setPisoStreetMenuOpen(false);
+    }
+
+    document.addEventListener("mousedown", handlePisoStreetOutsideClick);
+    return () => document.removeEventListener("mousedown", handlePisoStreetOutsideClick);
+  }, []);
+
+  useEffect(() => {
+    function handleUniversityOutsideClick(event: MouseEvent) {
+      if (!universityMenuRef.current) return;
+      if (universityMenuRef.current.contains(event.target as Node)) return;
+      setUniversityMenuOpen(false);
+    }
+
+    document.addEventListener("mousedown", handleUniversityOutsideClick);
+    return () => document.removeEventListener("mousedown", handleUniversityOutsideClick);
+  }, []);
+
+  useEffect(() => {
+    function handleZonesOutsideClick(event: MouseEvent) {
+      if (!zonesMenuRef.current) return;
+      if (zonesMenuRef.current.contains(event.target as Node)) return;
+      setZonesMenuOpen(false);
+    }
+
+    document.addEventListener("mousedown", handleZonesOutsideClick);
+    return () => document.removeEventListener("mousedown", handleZonesOutsideClick);
+  }, []);
+
+  useEffect(() => {
+    function handleLanguageOutsideClick(event: MouseEvent) {
+      if (!languageMenuRef.current) return;
+      if (languageMenuRef.current.contains(event.target as Node)) return;
+      setLanguageMenuOpen(false);
+    }
+
+    document.addEventListener("mousedown", handleLanguageOutsideClick);
+    return () => document.removeEventListener("mousedown", handleLanguageOutsideClick);
+  }, []);
+
+  useEffect(() => {
+    const search = data.ciudad.trim();
+
+    if (search.length < 2) {
+      setCitySuggestions([]);
+      setIsLoadingCities(false);
+      return;
+    }
+
+    let active = true;
+    setIsLoadingCities(true);
+
+    void (async () => {
+      try {
+        if (!mapboxToken) {
+          const fallback = CITIES
+            .filter((city) => normalizeForSearch(city).includes(normalizeForSearch(search)))
+            .slice(0, 10)
+            .map((city) => ({
+              id: city,
+              city,
+              label: `${city}, Espana`,
+            }));
+
+          if (active) {
+            setCitySuggestions(fallback);
+          }
+          return;
+        }
+
+        const response = await fetch(
+          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
+            search,
+          )}.json?autocomplete=true&types=place,locality&country=es&language=es&limit=10&access_token=${mapboxToken}`,
+        );
+
+        const payload = (await response.json()) as {
+          features?: Array<{ id: string; text?: string; place_name?: string }>;
+        };
+
+        const byCity = new Map<string, CitySuggestion>();
+
+        for (const feature of payload.features ?? []) {
+          const cityName = (feature.text ?? "").trim();
+          if (!cityName) continue;
+          const key = normalizeForSearch(cityName);
+
+          if (!byCity.has(key)) {
+            byCity.set(key, {
+              id: feature.id,
+              city: cityName,
+              label: feature.place_name ?? `${cityName}, Espana`,
+            });
+          }
+        }
+
+        if (active) {
+          setCitySuggestions(Array.from(byCity.values()));
+        }
+      } catch {
+        if (!active) return;
+
+        const fallback = CITIES
+          .filter((city) => normalizeForSearch(city).includes(normalizeForSearch(search)))
+          .slice(0, 10)
+          .map((city) => ({
+            id: city,
+            city,
+            label: `${city}, Espana`,
+          }));
+
+        setCitySuggestions(fallback);
+      } finally {
+        if (active) {
+          setIsLoadingCities(false);
+        }
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [data.ciudad, mapboxToken]);
+
+  useEffect(() => {
+    const search = pisoCityQuery.trim();
+
+    if (search.length < 2) {
+      setPisoCitySuggestions([]);
+      setIsLoadingPisoCities(false);
+      return;
+    }
+
+    let active = true;
+    setIsLoadingPisoCities(true);
+
+    void (async () => {
+      try {
+        if (!mapboxToken) {
+          const fallback = CITIES
+            .filter((city) => normalizeForSearch(city).includes(normalizeForSearch(search)))
+            .slice(0, 10)
+            .map((city) => ({ id: city, city, label: `${city}, Espana` }));
+
+          if (active) {
+            setPisoCitySuggestions(fallback);
+          }
+          return;
+        }
+
+        const response = await fetch(
+          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(search)}.json?autocomplete=true&types=place,locality&country=es&language=es&limit=10&access_token=${mapboxToken}`,
+        );
+
+        const payload = (await response.json()) as {
+          features?: Array<{ id: string; text?: string; place_name?: string }>;
+        };
+
+        const byCity = new Map<string, CitySuggestion>();
+        for (const feature of payload.features ?? []) {
+          const cityName = (feature.text ?? "").trim();
+          if (!cityName) continue;
+          const key = normalizeForSearch(cityName);
+          if (!byCity.has(key)) {
+            byCity.set(key, {
+              id: feature.id,
+              city: cityName,
+              label: feature.place_name ?? `${cityName}, Espana`,
+            });
+          }
+        }
+
+        if (active) {
+          setPisoCitySuggestions(Array.from(byCity.values()));
+        }
+      } catch {
+        if (!active) return;
+
+        const fallback = CITIES
+          .filter((city) => normalizeForSearch(city).includes(normalizeForSearch(search)))
+          .slice(0, 10)
+          .map((city) => ({ id: city, city, label: `${city}, Espana` }));
+
+        setPisoCitySuggestions(fallback);
+      } finally {
+        if (active) {
+          setIsLoadingPisoCities(false);
+        }
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [pisoCityQuery, mapboxToken]);
+
+  useEffect(() => {
+    const city = data.pisoCiudad.trim();
+    const search = pisoStreetQuery.trim();
+
+    if (!city || search.length < 1) {
+      setPisoStreetSuggestions([]);
+      setIsLoadingPisoStreets(false);
+      return;
+    }
+
+    const streetPrefixes = ["Calle", "Avenida", "Paseo", "Plaza", "Ronda", "Camino", "Pasaje", "Carretera"];
+    const fallbackStreets = streetPrefixes
+      .map((prefix) => `${prefix} ${search}`.trim())
+      .filter((label) => label.length > prefixMinLength(search))
+      .map((label) => ({ id: `fallback-${label}`, city: label, label: `${label}, ${city}` }));
+
+    if (!mapboxToken) {
+      setPisoStreetSuggestions(fallbackStreets);
+      return;
+    }
+
+    let active = true;
+    setIsLoadingPisoStreets(true);
+
+    void (async () => {
+      try {
+        const response = await fetch(
+          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(`${search}, ${city}`)}.json?autocomplete=true&types=address,place,locality&country=es&language=es&limit=15&access_token=${mapboxToken}`,
+        );
+
+        const payload = (await response.json()) as {
+          features?: Array<{ id: string; text?: string; place_name?: string }>;
+        };
+
+        const byStreet = new Map<string, CitySuggestion>();
+        for (const feature of payload.features ?? []) {
+          const streetName = (feature.text ?? "").trim();
+          const placeName = (feature.place_name ?? "").trim();
+          if (!streetName) continue;
+          if (placeName && !normalizeForSearch(placeName).includes(normalizeForSearch(city))) continue;
+
+          const key = normalizeForSearch(streetName);
+          if (!byStreet.has(key)) {
+            byStreet.set(key, {
+              id: feature.id,
+              city: streetName,
+              label: placeName || streetName,
+            });
+          }
+        }
+
+        for (const fallback of fallbackStreets) {
+          const key = normalizeForSearch(fallback.label);
+          if (!byStreet.has(key)) {
+            byStreet.set(key, fallback);
+          }
+        }
+
+        if (active) {
+          setPisoStreetSuggestions(Array.from(byStreet.values()));
+        }
+      } catch {
+        if (active) {
+          setPisoStreetSuggestions(fallbackStreets);
+        }
+      } finally {
+        if (active) {
+          setIsLoadingPisoStreets(false);
+        }
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [data.pisoCiudad, pisoStreetQuery, mapboxToken]);
+
+  function prefixMinLength(value: string) {
+    return Math.max(1, value.trim().length);
+  }
+
+  useEffect(() => {
+    const city = data.ciudad.trim();
+
+    if (!city) {
+      setZoneSuggestions([]);
+      setIsLoadingZones(false);
+      return;
+    }
+
+    const fallbackZones = (CITY_ZONES[city] ?? []).map((zone) => ({
+      id: `fallback-${zone}`,
+      label: zone,
+    }));
+
+    if (!mapboxToken) {
+      setZoneSuggestions(fallbackZones);
+      return;
+    }
+
+    let active = true;
+    setIsLoadingZones(true);
+
+    void (async () => {
+      try {
+        const response = await fetch(
+          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
+            city,
+          )}.json?autocomplete=true&types=neighborhood,district,locality&country=es&language=es&limit=20&access_token=${mapboxToken}`,
+        );
+
+        const payload = (await response.json()) as {
+          features?: Array<{ id: string; text?: string }>;
+        };
+
+        const byName = new Map<string, ZoneSuggestion>();
+
+        for (const item of payload.features ?? []) {
+          const text = (item.text ?? "").trim();
+          if (!text) continue;
+
+          const normalized = normalizeForSearch(text);
+          if (!byName.has(normalized)) {
+            byName.set(normalized, {
+              id: item.id,
+              label: formatLanguageLabel(text),
+            });
+          }
+        }
+
+        for (const fallback of fallbackZones) {
+          const normalized = normalizeForSearch(fallback.label);
+          if (!byName.has(normalized)) {
+            byName.set(normalized, fallback);
+          }
+        }
+
+        if (active) {
+          setZoneSuggestions(Array.from(byName.values()));
+        }
+      } catch {
+        if (active) {
+          setZoneSuggestions(fallbackZones);
+        }
+      } finally {
+        if (active) {
+          setIsLoadingZones(false);
+        }
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [data.ciudad, mapboxToken]);
 
   function setField<K extends keyof OnboardingData>(key: K, value: OnboardingData[K]) {
     setData((prev) => ({ ...prev, [key]: value }));
@@ -304,23 +935,35 @@ export function OnboardingFlow({ userId, email }: Props) {
         nextErrors.trabajo = "La profesion es obligatoria";
       }
 
-      if (!data.zonas.length) nextErrors.zonas = "Selecciona al menos una zona";
+      const parsedBudget = parseMoneyInput(budgetDraft);
+      if ((data.situacion === "busco_habitacion" || data.situacion === "buscar_juntos") && parsedBudget < 200) {
+        nextErrors.presupuestoMax = "Indica un presupuesto valido";
+      }
+
+      if (data.situacion === "tengo_piso_libre") {
+        const parsedPisoPrecio = parseMoneyInput(pisoPrecioDraft);
+        if (!data.pisoCiudad.trim()) nextErrors.pisoCiudad = "Selecciona la ciudad del piso";
+        if (!data.pisoCalle.trim()) nextErrors.pisoCalle = "Indica la calle del piso";
+        if (!parsedPisoPrecio || parsedPisoPrecio < 200) nextErrors.pisoPrecioAlquiler = "Indica un precio valido";
+        if (!data.pisoCompaneros || data.pisoCompaneros < 1 || data.pisoCompaneros > 20) nextErrors.pisoCompaneros = "Indica cuantos sois (1-20)";
+        if (!data.pisoFotosDataUrls.length) nextErrors.pisoFotosDataUrls = "Sube al menos una foto del piso";
+        if (!data.pisoDescripcion.trim()) nextErrors.pisoDescripcion = "Describe ambiente y normas";
+      }
+
+      const wantsRoomSearch = data.situacion === "busco_habitacion" || data.situacion === "buscar_juntos";
+      if (wantsRoomSearch && !data.zonas.length) nextErrors.zonas = "Selecciona al menos una zona";
     }
 
     if (currentStep === 3) {
       if (!data.fumar) nextErrors.fumar = "Selecciona una opcion";
       if (!data.mascotas) nextErrors.mascotas = "Selecciona una opcion";
-      if (!data.horario) nextErrors.horario = "Selecciona una opcion";
+      if (!data.horario && !data.horarioPersonal.trim()) nextErrors.horario = "Selecciona una opcion o escribe tu horario";
       if (!data.ambiente) nextErrors.ambiente = "Selecciona una opcion";
     }
 
     if (currentStep === 4) {
       if (!data.bio.trim()) nextErrors.bio = "La presentacion es obligatoria";
       if (data.bio.length > 300) nextErrors.bio = "Maximo 300 caracteres";
-      if (data.situacion === "tengo_piso_libre") {
-        if (!data.pisoFotosDataUrls.length) nextErrors.pisoFotosDataUrls = "Sube al menos una foto del piso";
-        if (!data.pisoDescripcion.trim()) nextErrors.pisoDescripcion = "Describe ambiente y normas";
-      }
     }
 
     setErrors(nextErrors);
@@ -360,9 +1003,14 @@ export function OnboardingFlow({ userId, email }: Props) {
   async function handlePisoFiles(files: FileList | null) {
     if (!files?.length) return;
 
-    const selected = Array.from(files).slice(0, 6 - data.pisoFotosDataUrls.length);
-    const urls = await Promise.all(selected.map((file) => toDataUrl(file)));
-    setField("pisoFotosDataUrls", [...data.pisoFotosDataUrls, ...urls].slice(0, 6));
+    setIsPisoFotosUploading(true);
+    try {
+      const selected = Array.from(files).slice(0, MAX_PISO_PHOTOS - data.pisoFotosDataUrls.length);
+      const urls = await Promise.all(selected.map((file) => toDataUrl(file)));
+      setField("pisoFotosDataUrls", [...data.pisoFotosDataUrls, ...urls].slice(0, MAX_PISO_PHOTOS));
+    } finally {
+      setIsPisoFotosUploading(false);
+    }
   }
 
   function sendSmsCode() {
@@ -396,8 +1044,20 @@ export function OnboardingFlow({ userId, email }: Props) {
     setGlobalError("");
 
     try {
+      const aficionesWithErasmus = data.esErasmus
+        ? Array.from(new Set([...data.aficiones, "erasmus"]))
+        : data.aficiones.filter((item) => item !== "erasmus");
+
+      const presupuestoMax = parseMoneyInput(budgetDraft);
+      const pisoPrecioAlquiler = parseMoneyInput(pisoPrecioDraft);
+      const pisoDireccion = [data.pisoCalle.trim(), data.pisoCiudad.trim()].filter(Boolean).join(", ");
+
       const payload = {
         ...data,
+        presupuestoMax,
+        pisoPrecioAlquiler,
+        pisoDireccion,
+        aficiones: aficionesWithErasmus,
         email,
       };
 
@@ -425,20 +1085,14 @@ export function OnboardingFlow({ userId, email }: Props) {
   }
 
   return (
-    <main className="min-h-screen bg-[#F8F8F8] px-4 py-5 text-slate-900 sm:px-6 lg:px-10 lg:py-8">
-      <div className="mx-auto w-full max-w-4xl rounded-[2rem] border border-white/80 bg-white/95 p-4 shadow-[0_24px_80px_rgba(15,23,42,0.06)] sm:p-6 lg:p-8">
-        <div className="mb-6">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-semibold text-[#FF6B6B]">{stepLabel(step)}</p>
-            <p className="text-xs text-slate-500">Guardado automatico activado</p>
-          </div>
-          <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-100">
-            <div
-              className="h-full rounded-full bg-[#FF6B6B] transition-all duration-300"
-              style={{ width: `${(step / 4) * 100}%` }}
-            />
-          </div>
-        </div>
+    <main className="min-h-screen bg-[#F5F1E9] px-4 py-6 text-slate-900 sm:px-6 lg:px-10 lg:py-8">
+      <div className="mx-auto w-full max-w-6xl rounded-2xl border border-black/10 bg-[#FFFDF9] p-5 shadow-[0_24px_70px_rgba(15,23,42,0.12),0_6px_20px_rgba(15,23,42,0.08)] sm:p-6 lg:p-8">
+        <StepHeader
+          logo={<BrandLogo className="h-20 w-auto max-w-full sm:h-24 [mix-blend-mode:multiply] drop-shadow-[0_10px_24px_rgba(37,99,235,0.16)]" />}
+          stepLabel={stepLabel(step)}
+          statusLabel="Guardado automático activado"
+          progress={(step / 4) * 100}
+        />
 
         <div className={`transition-all duration-200 ${animating ? "translate-x-1 opacity-40" : "translate-x-0 opacity-100"}`}>
           {step === 1 && (
@@ -455,33 +1109,164 @@ export function OnboardingFlow({ userId, email }: Props) {
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-semibold">Pais de origen</label>
-                  <input className={fieldClass(Boolean(errors.pais))} value={data.pais} onChange={(e) => setField("pais", e.target.value)} list="country-list" placeholder="Busca tu pais" />
-                  <datalist id="country-list">
-                    {paisSugerencias.map((country) => (
-                      <option key={country} value={country} />
-                    ))}
-                  </datalist>
+                  <div ref={countryMenuRef} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCountryMenuOpen((prev) => !prev);
+                        setCountryQuery(data.pais || "");
+                      }}
+                      className={`${fieldClass(Boolean(errors.pais))} flex items-center justify-between text-left`}
+                    >
+                      <span className={`truncate text-sm ${data.pais ? "text-slate-800" : "text-slate-500"}`}>
+                        {data.pais || "Selecciona tu pais"}
+                      </span>
+                      <span className="text-slate-500">▾</span>
+                    </button>
+
+                    {countryMenuOpen ? (
+                      <div className="absolute z-20 mt-2 w-full rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_16px_36px_rgba(15,23,42,0.16)]">
+                        <input
+                          value={countryQuery}
+                          onChange={(e) => setCountryQuery(e.target.value)}
+                          placeholder="Buscar pais"
+                          className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-[#FF6B6B]"
+                        />
+
+                        <div className="mt-2 max-h-56 overflow-y-auto rounded-xl border border-slate-100 bg-white">
+                          {filteredCountries.length ? (
+                            filteredCountries.map((country) => (
+                              <button
+                                key={country}
+                                type="button"
+                                onClick={() => {
+                                  setField("pais", country);
+                                  setCountryMenuOpen(false);
+                                }}
+                                className={`w-full cursor-pointer px-3 py-2 text-left text-sm hover:bg-slate-50 ${
+                                  data.pais === country ? "bg-[#FFF1F1] font-semibold text-[#d54848]" : "text-slate-700"
+                                }`}
+                              >
+                                {country}
+                              </button>
+                            ))
+                          ) : (
+                            <p className="px-3 py-2 text-sm text-slate-500">No hay paises con esa busqueda.</p>
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
                 <div className="sm:col-span-2">
                   <label className="mb-1 block text-sm font-semibold">Ciudad donde buscas piso</label>
-                  <input className={fieldClass(Boolean(errors.ciudad))} value={data.ciudad} onChange={(e) => setField("ciudad", e.target.value)} list="city-list" placeholder="Madrid, Barcelona..." />
-                  <datalist id="city-list">
-                    {ciudadSugerencias.map((city) => (
-                      <option key={city} value={city} />
-                    ))}
-                  </datalist>
+                  <div ref={cityMenuRef} className="relative">
+                    <input
+                      className={fieldClass(Boolean(errors.ciudad))}
+                      value={data.ciudad}
+                      onChange={(e) => {
+                        setField("ciudad", e.target.value);
+                        setCityMenuOpen(e.target.value.trim().length >= 2);
+                      }}
+                      onFocus={() => {
+                        if (data.ciudad.trim().length >= 2) {
+                          setCityMenuOpen(true);
+                        }
+                      }}
+                      placeholder="Escribe ciudad o pueblo en Espana"
+                    />
+
+                    {cityMenuOpen ? (
+                      <div className="absolute z-20 mt-2 w-full rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_16px_36px_rgba(15,23,42,0.16)]">
+                        <div className="max-h-56 overflow-y-auto rounded-xl border border-slate-100 bg-white">
+                          {isLoadingCities ? (
+                            <p className="px-3 py-2 text-sm text-slate-500">Buscando ciudades y pueblos...</p>
+                          ) : citySuggestions.length ? (
+                            citySuggestions.map((suggestion) => (
+                              <button
+                                key={suggestion.id}
+                                type="button"
+                                onClick={() => {
+                                  setField("ciudad", suggestion.city);
+                                  setCityMenuOpen(false);
+                                }}
+                                className="w-full cursor-pointer px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                              >
+                                <p className="font-semibold text-slate-800">{suggestion.city}</p>
+                                <p className="truncate text-xs text-slate-500">{suggestion.label}</p>
+                              </button>
+                            ))
+                          ) : (
+                            <p className="px-3 py-2 text-sm text-slate-500">No hay resultados. Prueba con otro nombre.</p>
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
                 <div className="sm:col-span-2">
                   <label className="mb-2 block text-sm font-semibold">Idiomas que hablas</label>
-                  <div className="flex flex-wrap gap-2">
-                    {LANG_OPTIONS.map((lang) => {
-                      const active = data.idiomas.includes(lang);
-                      return (
-                        <button key={lang} type="button" onClick={() => toggleArrayItem("idiomas", lang)} className={cardClass(active, Boolean(errors.idiomas))}>
-                          {lang}
-                        </button>
-                      );
-                    })}
+                  <div ref={languageMenuRef} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setLanguageMenuOpen((prev) => !prev)}
+                      className={`${fieldClass(Boolean(errors.idiomas))} flex items-center justify-between text-left`}
+                    >
+                      <span className="truncate text-sm text-slate-700">
+                        {data.idiomas.length ? `${data.idiomas.length} idioma(s) seleccionado(s)` : "Selecciona uno o varios idiomas"}
+                      </span>
+                      <span className="text-slate-500">▾</span>
+                    </button>
+
+                    {languageMenuOpen ? (
+                      <div className="absolute z-20 mt-2 w-full rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_16px_36px_rgba(15,23,42,0.16)]">
+                        <input
+                          value={languageQuery}
+                          onChange={(e) => setLanguageQuery(e.target.value)}
+                          placeholder="Buscar idioma"
+                          className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-[#FF6B6B]"
+                        />
+
+                        <div className="mt-2 max-h-56 overflow-y-auto rounded-xl border border-slate-100 bg-white">
+                          {filteredLanguageOptions.length ? (
+                            filteredLanguageOptions.map((item) => {
+                              const active = data.idiomas.some(
+                                (selected) => normalizeForSearch(selected) === normalizeForSearch(item.label),
+                              );
+                              return (
+                                <label key={item.code} className="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                                  <input
+                                    type="checkbox"
+                                    checked={active}
+                                    onChange={() => toggleArrayItem("idiomas", formatLanguageLabel(item.label))}
+                                    className="h-4 w-4 rounded border-slate-300 text-[#FF6B6B] focus:ring-[#FF6B6B]/20"
+                                  />
+                                  <span>{formatLanguageLabel(item.label)}</span>
+                                </label>
+                              );
+                            })
+                          ) : (
+                            <p className="px-3 py-2 text-sm text-slate-500">No hay idiomas con esa busqueda.</p>
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {data.idiomas.length ? (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {data.idiomas.map((lang) => (
+                          <button
+                            key={lang}
+                            type="button"
+                            onClick={() => toggleArrayItem("idiomas", lang)}
+                            className="inline-flex items-center gap-1 rounded-full border border-[#FFD1D1] bg-[#FFF1F1] px-3 py-1 text-xs font-semibold text-[#d54848]"
+                          >
+                            {formatLanguageLabel(lang)}
+                            <span aria-hidden="true">×</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
                 <div className="sm:col-span-2">
@@ -535,6 +1320,212 @@ export function OnboardingFlow({ userId, email }: Props) {
                 </div>
               </div>
 
+              <div>
+                <label className="mb-1 block text-sm font-semibold">Fecha aproximada de disponibilidad</label>
+                <input type="date" className={fieldClass(false)} value={data.disponibleDesde} onChange={(e) => setField("disponibleDesde", e.target.value)} />
+              </div>
+
+              {data.situacion === "tengo_piso_libre" && (
+                <div className="space-y-4 rounded-2xl border border-slate-200 bg-[#F8F8F8] p-4">
+                  <p className="text-sm font-semibold">Datos del piso en alquiler</p>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.06em] text-slate-500">Ciudad del piso</label>
+                      <div ref={pisoCityMenuRef} className="relative">
+                        <input
+                          value={pisoCityQuery || data.pisoCiudad}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setPisoCityQuery(value);
+                            setField("pisoCiudad", value);
+                            setPisoCityMenuOpen(value.trim().length >= 2);
+                            setField("pisoCalle", "");
+                            setPisoStreetQuery("");
+                          }}
+                          onFocus={() => {
+                            setPisoCityQuery(data.pisoCiudad || pisoCityQuery);
+                            setPisoCityMenuOpen(true);
+                          }}
+                          placeholder="Escribe la ciudad"
+                          className={`h-11 w-full rounded-xl border bg-white px-3 text-sm text-slate-800 outline-none transition ${errors.pisoCiudad ? "border-rose-400" : "border-slate-200 focus:border-[#3B82F6]"}`}
+                        />
+
+                        {pisoCityMenuOpen ? (
+                          <div className="absolute z-20 mt-2 w-full rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_16px_36px_rgba(15,23,42,0.16)]">
+                            {isLoadingPisoCities ? <p className="px-3 py-2 text-sm text-slate-500">Buscando ciudades...</p> : null}
+                            <div className="max-h-56 overflow-y-auto rounded-xl border border-slate-100 bg-white">
+                              {pisoCitySuggestions.length ? (
+                                pisoCitySuggestions.map((suggestion) => (
+                                  <button
+                                    key={suggestion.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setField("pisoCiudad", suggestion.city);
+                                      setPisoCityQuery(suggestion.city);
+                                      setPisoCityMenuOpen(false);
+                                      setField("pisoCalle", "");
+                                      setPisoStreetQuery("");
+                                    }}
+                                    className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                                  >
+                                    {suggestion.label}
+                                  </button>
+                                ))
+                              ) : !isLoadingPisoCities ? (
+                                <p className="px-3 py-2 text-sm text-slate-500">Escribe al menos 2 letras.</p>
+                              ) : null}
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.06em] text-slate-500">Precio de alquiler EUR/mes</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={pisoPrecioDraft}
+                        onChange={(e) => setPisoPrecioDraft(e.target.value.replace(/[^0-9]/g, ""))}
+                        onBlur={() => setField("pisoPrecioAlquiler", parseMoneyInput(pisoPrecioDraft))}
+                        className={`h-11 w-full rounded-xl border bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition ${errors.pisoPrecioAlquiler ? "border-rose-400" : "border-slate-200 focus:border-[#3B82F6]"}`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.06em] text-slate-500">Cuantos sois viviendo</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={20}
+                        value={data.pisoCompaneros}
+                        onChange={(e) => setField("pisoCompaneros", Math.min(20, Math.max(1, Number(e.target.value || 1))))}
+                        className={`h-11 w-full rounded-xl border bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition ${errors.pisoCompaneros ? "border-rose-400" : "border-slate-200 focus:border-[#3B82F6]"}`}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.06em] text-slate-500">Calle del piso</label>
+                    <div ref={pisoStreetMenuRef} className="relative">
+                      <input
+                        value={pisoStreetQuery || data.pisoCalle}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setPisoStreetQuery(value);
+                          setField("pisoCalle", value);
+                          setPisoStreetMenuOpen(value.trim().length >= 1 && Boolean(data.pisoCiudad.trim()));
+                        }}
+                        onFocus={() => {
+                          setPisoStreetQuery(data.pisoCalle || pisoStreetQuery);
+                          setPisoStreetMenuOpen(Boolean(data.pisoCiudad.trim()));
+                        }}
+                        placeholder={data.pisoCiudad ? `Escribe una calle de ${data.pisoCiudad}` : "Primero elige la ciudad"}
+                        disabled={!data.pisoCiudad.trim()}
+                        className={`h-11 w-full rounded-xl border bg-white px-3 text-sm text-slate-800 outline-none transition disabled:cursor-not-allowed disabled:bg-slate-100 ${errors.pisoCalle ? "border-rose-400" : "border-slate-200 focus:border-[#3B82F6]"}`}
+                      />
+
+                      {pisoStreetMenuOpen ? (
+                        <div className="absolute z-20 mt-2 w-full rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_16px_36px_rgba(15,23,42,0.16)]">
+                          {isLoadingPisoStreets ? <p className="px-3 py-2 text-sm text-slate-500">Buscando calles en {data.pisoCiudad}...</p> : null}
+                          <div className="max-h-56 overflow-y-auto rounded-xl border border-slate-100 bg-white">
+                            {pisoStreetSuggestions.length ? (
+                              pisoStreetSuggestions.map((suggestion) => (
+                                <button
+                                  key={suggestion.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setField("pisoCalle", suggestion.city);
+                                    setPisoStreetQuery(suggestion.city);
+                                    setPisoStreetMenuOpen(false);
+                                  }}
+                                  className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                                >
+                                  {suggestion.label}
+                                </button>
+                              ))
+                            ) : !isLoadingPisoStreets && data.pisoCiudad ? (
+                              <p className="px-3 py-2 text-sm text-slate-500">Escribe al menos una letra.</p>
+                            ) : null}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                    {errors.pisoCalle ? <p className="mt-2 text-xs font-medium text-rose-600">{errors.pisoCalle}</p> : null}
+                  </div>
+
+                  <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={data.pisoGastosIncluidos}
+                      onChange={(e) => setField("pisoGastosIncluidos", e.target.checked)}
+                      className="h-4 w-4 rounded border-slate-300 text-[#3B82F6] focus:ring-[#3B82F6]/20"
+                    />
+                    Gastos incluidos en el precio
+                  </label>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold">Fotos del piso</label>
+                    <label
+                      className={`flex min-h-48 cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed bg-white p-4 text-center transition ${
+                        errors.pisoFotosDataUrls ? "border-rose-400" : "border-slate-300 hover:border-[#3B82F6]"
+                      }`}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        void handlePisoFiles(e.dataTransfer.files);
+                      }}
+                    >
+                      <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => void handlePisoFiles(e.target.files)} />
+                      {data.pisoFotosDataUrls.length ? (
+                        <div className="w-full space-y-3 text-left">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-semibold text-slate-800">Fotos cargadas</p>
+                              <p className="text-xs text-slate-500">{data.pisoFotosDataUrls.length}/{MAX_PISO_PHOTOS} seleccionadas</p>
+                            </div>
+                            {isPisoFotosUploading ? <p className="text-xs font-semibold text-[#1D4ED8]">Cargando...</p> : null}
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                            {data.pisoFotosDataUrls.map((url, index) => (
+                              <div key={url} className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                                <img src={url} alt={`piso-${index + 1}`} className="h-28 w-full object-cover" />
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    setField("pisoFotosDataUrls", data.pisoFotosDataUrls.filter((_, i) => i !== index));
+                                  }}
+                                  className="absolute right-2 top-2 rounded-full bg-black/65 px-2 py-1 text-xs text-white"
+                                >
+                                  x
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-sm font-semibold">Arrastra o selecciona imágenes</p>
+                          <p className="mt-1 text-xs text-slate-500">Se irán mostrando al cargarse</p>
+                        </>
+                      )}
+                    </label>
+                    {errors.pisoFotosDataUrls ? <p className="mt-2 text-xs font-medium text-rose-600">{errors.pisoFotosDataUrls}</p> : null}
+                  </div>
+
+                  <textarea
+                    className={`min-h-24 w-full rounded-2xl border bg-white px-4 py-3 text-base outline-none transition focus:ring-4 ${errors.pisoDescripcion ? "border-rose-400 focus:border-rose-500 focus:ring-rose-100" : "border-slate-200 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/12"}`}
+                    placeholder="Describe ambiente del piso y normas"
+                    value={data.pisoDescripcion}
+                    onChange={(e) => setField("pisoDescripcion", e.target.value)}
+                  />
+                </div>
+              )}
+
               <div className="space-y-3">
                 <p className="text-sm font-semibold">Estudia o trabaja</p>
                 <div className="grid gap-2 sm:grid-cols-3">
@@ -543,12 +1534,51 @@ export function OnboardingFlow({ userId, email }: Props) {
                     { id: "trabajador", label: "Trabajador" },
                     { id: "ambas", label: "Ambas" },
                   ].map((item) => (
-                    <button key={item.id} type="button" className={cardClass(data.estudiaOTrabaja === item.id, Boolean(errors.estudiaOTrabaja))} onClick={() => setField("estudiaOTrabaja", item.id as EstudioTrabajo)}>
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={cardClass(data.estudiaOTrabaja === item.id, Boolean(errors.estudiaOTrabaja))}
+                      onClick={() => {
+                        const next = item.id as EstudioTrabajo;
+                        setField("estudiaOTrabaja", next);
+                        if (next === "trabajador") {
+                          setField("esErasmus", false);
+                        }
+                      }}
+                    >
                       {item.label}
                     </button>
                   ))}
                 </div>
               </div>
+
+              {(data.estudiaOTrabaja === "estudiante" || data.estudiaOTrabaja === "ambas") && (
+                <div className="space-y-3">
+                  <p className="text-sm font-semibold">Estas de Erasmus</p>
+                  <button
+                    type="button"
+                    onClick={() => setField("esErasmus", !data.esErasmus)}
+                    className={`flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left transition ${
+                      data.esErasmus
+                        ? "border-[#3B82F6] bg-[#EFF6FF]"
+                        : "border-slate-200 bg-white hover:border-[#93C5FD]"
+                    }`}
+                  >
+                    <span className="text-sm font-semibold text-slate-800">Estoy de Erasmus</span>
+                    <span
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
+                        data.esErasmus ? "bg-[#3B82F6]" : "bg-slate-300"
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-5 w-5 transform rounded-full bg-white transition ${
+                          data.esErasmus ? "translate-x-5" : "translate-x-1"
+                        }`}
+                      />
+                    </span>
+                  </button>
+                </div>
+              )}
 
               {(data.estudiaOTrabaja === "estudiante" || data.estudiaOTrabaja === "ambas") && (
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -558,12 +1588,54 @@ export function OnboardingFlow({ userId, email }: Props) {
                   </div>
                   <div>
                     <label className="mb-1 block text-sm font-semibold">Universidad</label>
-                    <input className={fieldClass(Boolean(errors.universidad))} value={data.universidad} onChange={(e) => setField("universidad", e.target.value)} list="uni-list" />
-                    <datalist id="uni-list">
-                      {UNIVERSIDADES.map((uni) => (
-                        <option key={uni} value={uni} />
-                      ))}
-                    </datalist>
+                    <div ref={universityMenuRef} className="relative">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUniversityMenuOpen((prev) => !prev);
+                          setUniversityQuery(data.universidad || "");
+                        }}
+                        className={`${fieldClass(Boolean(errors.universidad))} flex items-center justify-between text-left`}
+                      >
+                        <span className={`truncate text-sm ${data.universidad ? "text-slate-800" : "text-slate-500"}`}>
+                          {data.universidad || "Selecciona universidad"}
+                        </span>
+                        <span className="text-slate-500">▾</span>
+                      </button>
+
+                      {universityMenuOpen ? (
+                        <div className="absolute z-20 mt-2 w-full rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_16px_36px_rgba(15,23,42,0.16)]">
+                          <input
+                            value={universityQuery}
+                            onChange={(e) => setUniversityQuery(e.target.value)}
+                            placeholder="Buscar universidad"
+                            className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-[#3B82F6]"
+                          />
+
+                          <div className="mt-2 max-h-56 overflow-y-auto rounded-xl border border-slate-100 bg-white">
+                            {filteredUniversityOptions.length ? (
+                              filteredUniversityOptions.map((uni) => (
+                                <button
+                                  key={uni}
+                                  type="button"
+                                  onClick={() => {
+                                    setField("universidad", uni);
+                                    setUniversityMenuOpen(false);
+                                  }}
+                                  className={`w-full cursor-pointer px-3 py-2 text-left text-sm hover:bg-slate-50 ${
+                                    data.universidad === uni ? "bg-[#EFF6FF] font-semibold text-[#1D4ED8]" : "text-slate-700"
+                                  }`}
+                                >
+                                  {uni}
+                                </button>
+                              ))
+                            ) : (
+                              <p className="px-3 py-2 text-sm text-slate-500">No hay universidades con esa busqueda.</p>
+                            )}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               )}
@@ -575,120 +1647,207 @@ export function OnboardingFlow({ userId, email }: Props) {
                 </div>
               )}
 
-              <div className="rounded-2xl bg-[#FFF4F0] p-4">
-                <p className="text-sm font-semibold text-slate-700">Presupuesto maximo</p>
-                <p className="mt-1 text-3xl font-semibold text-[#FF6B6B]">{data.presupuestoMax} EUR</p>
-                <input type="range" min={200} max={2000} step={50} value={data.presupuestoMax} onChange={(e) => setField("presupuestoMax", Number(e.target.value))} className="mt-3 w-full accent-[#FF6B6B]" />
-              </div>
+              {(data.situacion === "busco_habitacion" || data.situacion === "buscar_juntos") && (
+                <>
+                  <div className="rounded-2xl bg-[#EEF5FF] p-4">
+                    <p className="text-sm font-semibold text-slate-700">Presupuesto maximo</p>
+                    <p className="mt-1 text-3xl font-semibold text-[#1D4ED8]">{parseMoneyInput(budgetDraft)} EUR</p>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-[180px_1fr] sm:items-center">
+                      <div>
+                        <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.06em] text-slate-500">Manual</label>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          value={budgetDraft}
+                          onChange={(e) => setBudgetDraft(e.target.value.replace(/[^0-9]/g, ""))}
+                          onBlur={() => setField("presupuestoMax", parseMoneyInput(budgetDraft))}
+                          className={`h-11 w-full rounded-xl border bg-white px-3 text-sm font-semibold text-slate-800 outline-none focus:border-[#3B82F6] ${errors.presupuestoMax ? "border-rose-400" : "border-slate-200"}`}
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.06em] text-slate-500">Deslizador</label>
+                        <input
+                          type="range"
+                          min={200}
+                          max={5000}
+                          step={50}
+                          value={parseMoneyInput(budgetDraft)}
+                          onChange={(e) => {
+                            const nextBudget = clampBudget(Number(e.target.value));
+                            setField("presupuestoMax", nextBudget);
+                            setBudgetDraft(String(nextBudget));
+                          }}
+                          className="w-full accent-[#3B82F6]"
+                        />
+                      </div>
+                    </div>
+                    {errors.presupuestoMax ? <p className="mt-2 text-xs font-medium text-rose-600">{errors.presupuestoMax}</p> : null}
+                  </div>
 
-              <div>
-                <p className="mb-2 text-sm font-semibold">Zonas preferidas</p>
-                <div className="flex flex-wrap gap-2">
-                  {(zonasDisponibles.length ? zonasDisponibles : ["Centro", "Norte", "Sur", "Este", "Oeste"]).map((zone) => {
-                    const active = data.zonas.includes(zone);
-                    return (
-                      <button key={zone} type="button" onClick={() => toggleArrayItem("zonas", zone)} className={cardClass(active, Boolean(errors.zonas))}>
-                        {zone}
+                  <div>
+                    <p className="mb-2 text-sm font-semibold">Zonas preferidas</p>
+                    {isLoadingZones ? <p className="mb-2 text-xs text-slate-500">Cargando barrios sugeridos...</p> : null}
+                    <div ref={zonesMenuRef} className="relative">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setZonesMenuOpen((prev) => !prev);
+                          setZonesQuery("");
+                        }}
+                        className={`${fieldClass(Boolean(errors.zonas))} flex items-center justify-between text-left`}
+                      >
+                        <span className="truncate text-sm text-slate-700">
+                          {data.zonas.length ? `${data.zonas.length} zona(s) seleccionada(s)` : "Selecciona zonas preferidas"}
+                        </span>
+                        <span className="text-slate-500">▾</span>
                       </button>
-                    );
-                  })}
-                </div>
-              </div>
 
-              <div>
-                <label className="mb-1 block text-sm font-semibold">Fecha aproximada de disponibilidad (opcional)</label>
-                <input type="date" className={fieldClass(false)} value={data.disponibleDesde} onChange={(e) => setField("disponibleDesde", e.target.value)} />
-              </div>
+                      {zonesMenuOpen ? (
+                        <div className="absolute z-20 mt-2 w-full rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_16px_36px_rgba(15,23,42,0.16)]">
+                          <input
+                            value={zonesQuery}
+                            onChange={(e) => setZonesQuery(e.target.value)}
+                            placeholder="Buscar barrio o zona"
+                            className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-[#3B82F6]"
+                          />
+
+                          <div className="mt-2 max-h-56 overflow-y-auto rounded-xl border border-slate-100 bg-white">
+                            {(filteredZones.length ? filteredZones : ["Centro", "Norte", "Sur", "Este", "Oeste"]).map((zone) => {
+                              const active = data.zonas.includes(zone);
+                              return (
+                                <label key={zone} className="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                                  <input
+                                    type="checkbox"
+                                    checked={active}
+                                    onChange={() => toggleArrayItem("zonas", zone)}
+                                    className="h-4 w-4 rounded border-slate-300 text-[#3B82F6] focus:ring-[#3B82F6]/20"
+                                  />
+                                  <span>{zone}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {data.zonas.length ? (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {data.zonas.map((zone) => (
+                            <button
+                              key={zone}
+                              type="button"
+                              onClick={() => toggleArrayItem("zonas", zone)}
+                              className="inline-flex items-center gap-1 rounded-full border border-[#BFDBFE] bg-[#EFF6FF] px-3 py-1 text-xs font-semibold text-[#1D4ED8]"
+                            >
+                              {zone}
+                              <span aria-hidden="true">×</span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                </>
+              )}
             </section>
           )}
 
           {step === 3 && (
-            <section className="space-y-5">
-              <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Forma de vivir</h1>
-
-              <div>
-                <p className="mb-2 text-sm font-semibold">Fumas</p>
-                <div className="grid gap-2 sm:grid-cols-3">
-                  {[
-                    { id: "no_fumo", label: "No fumo" },
-                    { id: "solo_fuera", label: "Solo fuera de casa" },
-                    { id: "si_fumo", label: "Si fumo" },
-                  ].map((item) => (
-                    <button key={item.id} type="button" className={cardClass(data.fumar === item.id, Boolean(errors.fumar))} onClick={() => setField("fumar", item.id as Fumar)}>{item.label}</button>
-                  ))}
-                </div>
+            <section className="space-y-6">
+              <div className="space-y-2">
+                <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Forma de vivir</h1>
+                <p className="text-sm text-slate-500">Selecciona las opciones que mejor describen tu estilo de vida y convivencia.</p>
               </div>
 
-              <div>
-                <p className="mb-2 text-sm font-semibold">Mascotas</p>
-                <div className="grid gap-2 sm:grid-cols-3">
-                  {[
-                    { id: "tengo_mascota", label: "Tengo mascota" },
-                    { id: "acepto_mascotas", label: "Acepto mascotas" },
-                    { id: "no_acepto", label: "No acepto mascotas" },
-                  ].map((item) => (
-                    <button key={item.id} type="button" className={cardClass(data.mascotas === item.id, Boolean(errors.mascotas))} onClick={() => setField("mascotas", item.id as Mascotas)}>{item.label}</button>
-                  ))}
-                </div>
-              </div>
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <SectionCard>
+                  <SelectField
+                    label="Fumas"
+                    value={data.fumar}
+                    placeholder="Selecciona una opción"
+                    options={[
+                      { value: "no_fumo", label: "No fumo" },
+                      { value: "solo_fuera", label: "Solo fuera de casa" },
+                      { value: "si_fumo", label: "Si fumo" },
+                    ]}
+                    onChange={(value) => setField("fumar", value as Fumar)}
+                    error={Boolean(errors.fumar)}
+                  />
+                </SectionCard>
 
-              <div>
-                <p className="mb-2 text-sm font-semibold">Horario general</p>
-                <div className="grid gap-2 sm:grid-cols-3">
-                  {[
-                    { id: "madrugador", label: "Madrugador", desc: "Antes de las 8" },
-                    { id: "normal", label: "Normal", desc: "Horario estandar" },
-                    { id: "nocturno", label: "Nocturno", desc: "Despues de la 1" },
-                  ].map((item) => (
-                    <button key={item.id} type="button" className={cardClass(data.horario === item.id, Boolean(errors.horario))} onClick={() => setField("horario", item.id as Horario)}>
-                      <p>{item.label}</p>
-                      <p className="mt-1 text-xs font-normal opacity-90">{item.desc}</p>
-                    </button>
-                  ))}
-                </div>
-              </div>
+                <SectionCard>
+                  <ToggleGroup
+                    label="Mascotas"
+                    value={data.mascotas}
+                    onChange={(value) => setField("mascotas", value as Mascotas)}
+                    options={[
+                      { id: "tengo_mascota", label: "Tengo mascota" },
+                      { id: "acepto_mascotas", label: "Acepto mascotas" },
+                      { id: "no_acepto", label: "No acepto mascotas" },
+                    ]}
+                  />
+                </SectionCard>
 
-              <div>
-                <p className="mb-2 text-sm font-semibold">Ambiente en casa</p>
-                <div className="grid gap-2 sm:grid-cols-3">
-                  {[
-                    { id: "tranquilo", label: "Tranquilo", desc: "Silencio y calma" },
-                    { id: "equilibrado", label: "Equilibrado", desc: "Mezcla de los dos" },
-                    { id: "social", label: "Social y animado", desc: "Me gusta tener gente" },
-                  ].map((item) => (
-                    <button key={item.id} type="button" className={cardClass(data.ambiente === item.id, Boolean(errors.ambiente))} onClick={() => setField("ambiente", item.id as Ambiente)}>
-                      <p>{item.label}</p>
-                      <p className="mt-1 text-xs font-normal opacity-90">{item.desc}</p>
-                    </button>
-                  ))}
-                </div>
-              </div>
+                <SectionCard>
+                  <RadioGroup
+                    label="Horario general"
+                    value={data.horario}
+                    onChange={(value) => setField("horario", value as Horario)}
+                    options={[
+                      { id: "madrugador", label: "Madrugador", description: "Antes de las 8" },
+                      { id: "normal", label: "Normal", description: "Horario estandar" },
+                      { id: "nocturno", label: "Nocturno", description: "Despues de la 1" },
+                    ]}
+                  />
+                  <div className="mt-4">
+                    <label className="mb-1 block text-sm font-semibold text-slate-800">Tu horario (opcional)</label>
+                    <input
+                      value={data.horarioPersonal}
+                      onChange={(event) => setField("horarioPersonal", event.target.value)}
+                      placeholder="Ej: Trabajo de 9 a 17 y entreno por la tarde"
+                      className="h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                    />
+                  </div>
+                </SectionCard>
 
-              <div>
-                <p className="mb-2 text-sm font-semibold">Haces deporte (opcional)</p>
-                <div className="grid gap-2 sm:grid-cols-3">
-                  {[
-                    { id: "poco", label: "Poco o nada" },
-                    { id: "algunas", label: "Algunas veces" },
-                    { id: "frecuente", label: "Frecuentemente" },
-                  ].map((item) => (
-                    <button key={item.id} type="button" className={cardClass(data.deporte === item.id)} onClick={() => setField("deporte", item.id as Deporte)}>{item.label}</button>
-                  ))}
-                </div>
-              </div>
+                <SectionCard className="space-y-5">
+                  <ToggleGroup
+                    label="Ambiente en casa"
+                    value={data.ambiente}
+                    onChange={(value) => setField("ambiente", value as Ambiente)}
+                    options={[
+                      { id: "tranquilo", label: "Tranquilo", description: "Silencio y calma" },
+                      { id: "equilibrado", label: "Equilibrado", description: "Mezcla de los dos" },
+                      { id: "social", label: "Social y animado", description: "Me gusta tener gente" },
+                    ]}
+                  />
 
-              <div>
-                <p className="mb-2 text-sm font-semibold">Aficiones e intereses (opcional)</p>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  {HOBBIES.map((hobby) => {
-                    const active = data.aficiones.includes(hobby.id);
-                    return (
-                      <button key={hobby.id} type="button" className={cardClass(active)} onClick={() => toggleArrayItem("aficiones", hobby.id)}>
-                        {hobby.label}
-                      </button>
-                    );
-                  })}
-                </div>
+                  <SelectField
+                    label="Deportes"
+                    value={data.deporte}
+                    placeholder="Selecciona tu frecuencia"
+                    options={[
+                      { value: "poco", label: "Poco o nada" },
+                      { value: "algunas", label: "Algunas veces" },
+                      { value: "frecuente", label: "Frecuentemente" },
+                    ]}
+                    onChange={(value) => setField("deporte", value as Deporte)}
+                  />
+
+                  <ChipList
+                    label="Aficiones e intereses (opcional)"
+                    items={HOBBIES}
+                    selectedIds={data.aficiones}
+                    onToggle={(id) => toggleArrayItem("aficiones", id)}
+                    onAddCustom={(value) => {
+                      const normalized = value.trim();
+                      if (!normalized) return;
+                      if (data.aficiones.some((item) => item.toLowerCase() === normalized.toLowerCase())) return;
+                      setField("aficiones", [...data.aficiones, normalized]);
+                    }}
+                  />
+                </SectionCard>
               </div>
             </section>
           )}
@@ -707,35 +1866,6 @@ export function OnboardingFlow({ userId, email }: Props) {
                 />
                 <p className="mt-1 text-right text-xs text-slate-500">{data.bio.length}/300</p>
               </div>
-
-              {data.situacion === "tengo_piso_libre" && (
-                <div className="space-y-4 rounded-2xl border border-slate-200 bg-[#F8F8F8] p-4">
-                  <p className="text-sm font-semibold">Fotos del piso (hasta 6)</p>
-                  <input type="file" accept="image/*" multiple onChange={(e) => handlePisoFiles(e.target.files)} className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm" />
-                  {!!data.pisoFotosDataUrls.length && (
-                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                      {data.pisoFotosDataUrls.map((url, index) => (
-                        <div key={url} className="relative">
-                          <img src={url} alt={`piso-${index + 1}`} className="h-28 w-full rounded-xl object-cover" />
-                          <button
-                            type="button"
-                            onClick={() => setField("pisoFotosDataUrls", data.pisoFotosDataUrls.filter((_, i) => i !== index))}
-                            className="absolute right-2 top-2 rounded-full bg-black/65 px-2 py-1 text-xs text-white"
-                          >
-                            x
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <textarea
-                    className={`min-h-24 w-full rounded-2xl border bg-white px-4 py-3 text-base outline-none transition focus:ring-4 ${errors.pisoDescripcion ? "border-rose-400 focus:border-rose-500 focus:ring-rose-100" : "border-slate-200 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/12"}`}
-                    placeholder="Describe ambiente del piso y normas"
-                    value={data.pisoDescripcion}
-                    onChange={(e) => setField("pisoDescripcion", e.target.value)}
-                  />
-                </div>
-              )}
 
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
                 <p className="text-sm font-semibold">Verificacion de telefono (opcional)</p>
@@ -768,15 +1898,17 @@ export function OnboardingFlow({ userId, email }: Props) {
           </div>
         ) : null}
 
-        <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <button type="button" onClick={goBack} disabled={step === 1 || isSaving} className="min-h-12 rounded-2xl border border-slate-200 px-5 text-sm font-semibold text-slate-700 transition hover:border-[#FF6B6B] hover:text-[#FF6B6B] disabled:cursor-not-allowed disabled:opacity-50">
-            Volver
-          </button>
-          <button type="button" onClick={goNext} disabled={isSaving} className="min-h-12 rounded-2xl bg-[#FF6B6B] px-5 text-sm font-semibold text-white shadow-[0_18px_40px_rgba(255,107,107,0.28)] transition hover:bg-[#ff5b5b] disabled:cursor-not-allowed disabled:opacity-60">
-            {step === 4 ? (isSaving ? "Guardando perfil..." : "Completar perfil y empezar a explorar") : "Continuar"}
-          </button>
-        </div>
+        <FooterActions
+          backLabel="Volver"
+          continueLabel={step === 4 ? (isSaving ? "Guardando perfil..." : "Completar perfil y empezar a explorar") : "Continuar"}
+          onBack={goBack}
+          onContinue={goNext}
+          disableBack={step === 1 || isSaving}
+          disableContinue={isSaving}
+        />
       </div>
     </main>
   );
 }
+
+const MAX_PISO_PHOTOS = 20;

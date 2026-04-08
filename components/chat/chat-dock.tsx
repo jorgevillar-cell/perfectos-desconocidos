@@ -8,10 +8,11 @@ import { PaymentRequestForm } from "@/components/chat/payment-request-form";
 import { logoutAction } from "@/lib/auth/actions";
 import { getPusherClient } from "@/lib/chat/pusher-client";
 import type { ChatMessage, ConversationSummary, MatchCelebrationPayload } from "@/lib/chat/types";
+import { ContactRequestsPanel } from "@/components/chat/request-inbox-panel";
 import { formatMoney } from "@/lib/stripe";
 import type { PaymentSummary } from "@/lib/payments/types";
 
-type ActivePanel = "profile" | "chat" | "notifications" | "settings" | null;
+type ActivePanel = "profile" | "chat" | "requests" | "notifications" | "settings" | null;
 
 type ChatDockProps = {
   currentUserId: string;
@@ -122,6 +123,40 @@ function IconButton({
   );
 }
 
+function MobileDockButton({
+  active,
+  badge,
+  label,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  badge?: number;
+  label: string;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button type="button" onClick={onClick} className="relative flex w-[68px] flex-col items-center gap-1.5">
+      <span
+        className={`relative inline-flex h-11 w-11 items-center justify-center rounded-2xl border transition ${
+          active
+            ? "border-[#ff7f7f] bg-[linear-gradient(160deg,#FFE4E4_0%,#FFD2D2_100%)] text-[#E45A5A] shadow-[0_10px_22px_rgba(255,107,107,0.28)]"
+            : "border-[#E6EAF0] bg-[linear-gradient(160deg,#F8FBFF_0%,#EEF4FF_100%)] text-[#667085]"
+        }`}
+      >
+        {children}
+        {badge && badge > 0 ? (
+          <span className="absolute -right-1 -top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#FF6B6B] px-1 text-[11px] font-bold text-white">
+            {badge > 99 ? "99+" : badge}
+          </span>
+        ) : null}
+      </span>
+      <span className={`text-[11px] font-semibold ${active ? "text-[#1F2937]" : "text-[#7A8494]"}`}>{label}</span>
+    </button>
+  );
+}
+
 export function ChatDock({
   currentUserId,
   currentUserName,
@@ -137,6 +172,7 @@ export function ChatDock({
   const [messagesByMatch, setMessagesByMatch] = useState<Record<string, ChatMessage[]>>({});
   const [loadingConversations, setLoadingConversations] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [requestBadgeCount, setRequestBadgeCount] = useState(0);
   const [draft, setDraft] = useState("");
   const [typingByMatch, setTypingByMatch] = useState<Record<string, boolean>>({});
   const [toasts, setToasts] = useState<ToastItem[]>([]);
@@ -260,12 +296,56 @@ export function ChatDock({
       if (!activeMatchId && nextConversations.length) {
         setActiveMatchId(nextConversations[0].matchId);
       }
+
+      return nextConversations;
     } catch (error) {
       pushToast(error instanceof Error ? error.message : "No se pudieron cargar las conversaciones");
+      return null;
     } finally {
       setLoadingConversations(false);
     }
   }, [activeMatchId, openChatWithUserId, pushToast]);
+
+  const loadRequestBadge = useCallback(async () => {
+    try {
+      const response = await fetch("/api/matches/solicitudes", {
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        return;
+      }
+
+      const payload = (await response.json()) as { pendingReceivedCount?: number };
+      setRequestBadgeCount(payload.pendingReceivedCount ?? 0);
+    } catch {
+      return;
+    }
+  }, []);
+
+  const handleRequestCountChange = useCallback((count: number) => {
+    setRequestBadgeCount(count);
+  }, []);
+
+  const openChatFromRequest = useCallback(
+    async ({
+      otherUserId,
+      matchId,
+    }: {
+      otherUserId: string;
+      matchId: string;
+      otherUserName: string;
+      otherUserPhoto: string | null;
+      compatibility: number;
+    }) => {
+      const nextConversations = await loadConversations();
+      const conversation = nextConversations?.find((item) => item.otherUserId === otherUserId) ?? null;
+      setActivePanel("chat");
+      setActiveMatchId(conversation?.matchId ?? matchId ?? null);
+      setShowPaymentRequestForm(false);
+    },
+    [loadConversations],
+  );
 
   const loadMessages = useCallback(
     async (matchId: string) => {
@@ -301,6 +381,10 @@ export function ChatDock({
   useEffect(() => {
     void loadConversations();
   }, [loadConversations]);
+
+  useEffect(() => {
+    void loadRequestBadge();
+  }, [loadRequestBadge]);
 
   useEffect(() => {
     if (!activeMatchId || !activePanel || activePanel !== "chat") {
@@ -625,8 +709,8 @@ export function ChatDock({
     <>
       <aside
         ref={sidebarRef}
-        className="fixed left-0 top-0 z-40 flex h-screen w-16 flex-col items-center justify-start gap-5 border-r border-[#E5E7EB] bg-white pt-6"
-        style={{ boxShadow: "6px 0 24px rgba(0,0,0,0.08)" }}
+        className="fixed right-0 top-0 z-40 flex h-screen w-16 flex-col items-center justify-start gap-5 border-l border-[#E5E7EB] bg-white pt-6 max-sm:hidden"
+        style={{ boxShadow: "-6px 0 24px rgba(0,0,0,0.08)" }}
       >
         <div className="flex flex-1 flex-col items-center gap-5">
           <button
@@ -646,6 +730,13 @@ export function ChatDock({
             <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M4 6h16v10H8l-4 3V6Z" />
               <path d="M8 10h8" />
+            </svg>
+          </IconButton>
+
+          <IconButton active={activePanel === "requests"} badge={requestBadgeCount} onClick={() => togglePanel("requests")}>
+            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M4 5h16v14H4z" />
+              <path d="M4 8l8 5 8-5" />
             </svg>
           </IconButton>
 
@@ -686,11 +777,61 @@ export function ChatDock({
         </div>
       </aside>
 
+      <nav
+        className={`fixed inset-x-0 bottom-3 z-40 flex justify-center px-3 sm:hidden ${
+          activePanel ? "pointer-events-none opacity-0" : "pointer-events-auto opacity-100"
+        }`}
+      >
+        <div
+          className="flex items-end gap-1.5 rounded-[26px] border border-[#E6EAF0] bg-white/92 px-2.5 py-2 backdrop-blur"
+          style={{ boxShadow: "0 14px 38px rgba(15,23,42,0.16)" }}
+        >
+          <MobileDockButton active={activePanel === "chat"} badge={unreadTotal} label="Mensajes" onClick={() => togglePanel("chat")}>
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M4 6h16v10H8l-4 3V6Z" />
+              <path d="M8 10h8" />
+            </svg>
+          </MobileDockButton>
+
+          <MobileDockButton active={activePanel === "requests"} badge={requestBadgeCount} label="Solicitudes" onClick={() => togglePanel("requests")}>
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M4 5h16v14H4z" />
+              <path d="M4 8l8 5 8-5" />
+            </svg>
+          </MobileDockButton>
+
+          <MobileDockButton active={activePanel === "notifications"} label="Avisos" onClick={() => togglePanel("notifications")}>
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M15 17H5l2-2v-4a5 5 0 1 1 10 0v4l2 2h-4" />
+              <path d="M10 20a2 2 0 0 0 4 0" />
+            </svg>
+          </MobileDockButton>
+
+          <MobileDockButton active={activePanel === "settings"} label="Explorar" onClick={() => togglePanel("settings")}>
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 3v3" />
+              <path d="M12 18v3" />
+              <path d="M4.93 4.93l2.12 2.12" />
+              <path d="M16.95 16.95l2.12 2.12" />
+              <path d="M3 12h3" />
+              <path d="M18 12h3" />
+              <path d="M4.93 19.07l2.12-2.12" />
+              <path d="M16.95 7.05l2.12-2.12" />
+              <circle cx="12" cy="12" r="4" />
+            </svg>
+          </MobileDockButton>
+
+          <MobileDockButton active={activePanel === "profile"} label="Perfil" onClick={() => togglePanel("profile")}>
+            <span className="text-[14px] font-bold">{avatarLabel || "U"}</span>
+          </MobileDockButton>
+        </div>
+      </nav>
+
       <section
         ref={panelRef}
         className={`fixed bottom-0 top-0 z-30 transition-transform duration-[250ms] ease-in-out ${
-          activePanel ? "translate-x-0" : "-translate-x-full"
-        } left-16 w-[min(960px,calc(100vw-64px))] max-sm:left-0 max-sm:w-screen`}
+          activePanel ? "translate-x-0" : "translate-x-full"
+        } right-16 w-[min(960px,calc(100vw-64px))] max-sm:right-0 max-sm:w-screen`}
       >
         {activePanel ? (
           <div className="h-full border-r border-[#E5E7EB] bg-white" style={{ boxShadow: "8px 0 24px rgba(0,0,0,0.12)" }}>
@@ -707,7 +848,15 @@ export function ChatDock({
               </button>
 
               <p className="text-[15px] font-semibold text-[#1A1A1A]">
-                {activePanel === "chat" ? "Mensajes" : activePanel === "profile" ? "Perfil" : activePanel === "notifications" ? "Notificaciones" : "Ajustes"}
+                {activePanel === "chat"
+                  ? "Mensajes"
+                  : activePanel === "requests"
+                  ? "Solicitudes"
+                  : activePanel === "profile"
+                  ? "Perfil"
+                  : activePanel === "notifications"
+                  ? "Notificaciones"
+                  : "Ajustes"}
               </p>
 
               <div className="h-9 w-9" />
@@ -967,6 +1116,12 @@ export function ChatDock({
                   )}
                 </div>
               </div>
+            ) : activePanel === "requests" ? (
+              <ContactRequestsPanel
+                active={activePanel === "requests"}
+                onCountsChange={handleRequestCountChange}
+                onOpenChat={openChatFromRequest}
+              />
             ) : (
               <div className="flex h-full items-center justify-center px-8 text-center">
                 <div className="space-y-4">

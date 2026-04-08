@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 
 import { createIncidentRecord, getPaymentRow, getUser, triggerPaymentUpdate, upsertPaymentStatus } from "@/lib/payments/service";
-import { sendNotificationEmail } from "@/lib/notifications/email";
+import { sendIncidentAlertEmail } from "@/lib/notifications/email";
 import { uploadDataUrl } from "@/lib/storage/uploads";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+function getAppUrl() {
+  return process.env.NEXT_PUBLIC_SITE_URL ?? process.env.SITE_URL ?? "https://perfectos-desconocidos-5hgb.vercel.app";
+}
 
 type Payload = {
   paymentId?: string;
@@ -60,13 +64,20 @@ export async function POST(request: Request) {
 
   await upsertPaymentStatus(paymentId, "incidencia_abierta");
 
-  const owner = await getUser(payment.propietarioId);
-  if (owner) {
-    await sendNotificationEmail({
+  const [owner, tenant] = await Promise.all([
+    getUser(payment.propietarioId),
+    getUser(payment.inquilinoId),
+  ]);
+
+  if (owner && tenant) {
+    await sendIncidentAlertEmail({
       to: [process.env.PLATFORM_TEAM_EMAIL ?? "soporte@perfectosdesconocidos.com"],
-      subject: "Nueva incidencia abierta",
-      html: `<p>Pago: ${payment.id}</p><p>${descripcion}</p>`,
-    }).catch(() => undefined);
+      paymentId: payment.id,
+      description: descripcion,
+      tenantName: tenant.nombre,
+      ownerName: owner.nombre,
+      reviewUrl: `${getAppUrl()}/admin/incidencias/${incident.id}`,
+    });
   }
 
   await triggerPaymentUpdate(

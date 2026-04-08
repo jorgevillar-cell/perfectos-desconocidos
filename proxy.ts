@@ -75,7 +75,9 @@ async function proxyHandler(request: NextRequest) {
   }
 
   if (isProtectedPage && !user) {
-    const redirectResponse = NextResponse.redirect(new URL("/login", request.url));
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("next", `${pathname}${request.nextUrl.search}`);
+    const redirectResponse = NextResponse.redirect(loginUrl);
     copyCookies(response, redirectResponse);
     return redirectResponse;
   }

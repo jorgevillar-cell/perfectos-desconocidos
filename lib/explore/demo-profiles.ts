@@ -9,6 +9,7 @@ export type DemoProfile = {
   idiomas: string[];
   situacion: string;
   estudiaOTrabaja: string;
+  esErasmus: boolean;
   fumar: boolean;
   mascotas: boolean;
   horario: string;
@@ -23,6 +24,7 @@ export type DemoProfile = {
   pisos: Array<{
     precio: number;
     zona: string;
+    direccion?: string | null;
     descripcion: string;
     disponibleDesde: string;
     gastosIncluidos: boolean;
@@ -45,6 +47,7 @@ export function getDemoProfiles(): DemoProfile[] {
       idiomas: ["espanol", "ingles"],
       situacion: "busco_habitacion",
       estudiaOTrabaja: "estudiante",
+      esErasmus: true,
       fumar: false,
       mascotas: true,
       horario: "madrugador",
@@ -71,6 +74,7 @@ export function getDemoProfiles(): DemoProfile[] {
       idiomas: ["espanol"],
       situacion: "tengo_piso_libre",
       estudiaOTrabaja: "trabajador",
+      esErasmus: false,
       fumar: false,
       mascotas: false,
       horario: "normal",
@@ -109,6 +113,7 @@ export function getDemoProfiles(): DemoProfile[] {
       idiomas: ["espanol", "catalan", "ingles"],
       situacion: "buscar_juntos",
       estudiaOTrabaja: "ambas",
+      esErasmus: true,
       fumar: false,
       mascotas: true,
       horario: "nocturno",
@@ -135,6 +140,7 @@ export function getDemoProfiles(): DemoProfile[] {
       idiomas: ["espanol", "ingles"],
       situacion: "tengo_piso_libre",
       estudiaOTrabaja: "trabajador",
+      esErasmus: false,
       fumar: true,
       mascotas: true,
       horario: "normal",
@@ -173,6 +179,7 @@ export function getDemoProfiles(): DemoProfile[] {
       idiomas: ["espanol", "frances"],
       situacion: "busco_habitacion",
       estudiaOTrabaja: "estudiante",
+      esErasmus: true,
       fumar: false,
       mascotas: false,
       horario: "madrugador",
@@ -199,6 +206,7 @@ export function getDemoProfiles(): DemoProfile[] {
       idiomas: ["espanol", "ingles", "italiano"],
       situacion: "buscar_juntos",
       estudiaOTrabaja: "trabajador",
+      esErasmus: false,
       fumar: false,
       mascotas: true,
       horario: "nocturno",

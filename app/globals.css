@@ -27,6 +27,20 @@ body {
   font-family: var(--font-inter), Arial, Helvetica, sans-serif;
 }
 
+a[href],
+button,
+summary,
+[role="button"],
+input[type="button"],
+input[type="submit"] {
+  cursor: pointer;
+}
+
+button:disabled,
+input:disabled {
+  cursor: not-allowed;
+}
+
 @keyframes fade-up {
   from {
     opacity: 0;

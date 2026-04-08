@@ -12,6 +12,7 @@ type AuthMode = "login" | "register";
 
 type AuthFormProps = {
   mode: AuthMode;
+  nextPath?: string | null;
 };
 
 const initialState: AuthFormState = {
@@ -29,7 +30,7 @@ const copy = {
   },
 } as const;
 
-export function AuthForm({ mode }: AuthFormProps) {
+export function AuthForm({ mode, nextPath }: AuthFormProps) {
   const [state, formAction, pending] = useActionState(
     mode === "login" ? loginAction : registerAction,
     initialState,
@@ -37,6 +38,7 @@ export function AuthForm({ mode }: AuthFormProps) {
 
   return (
     <form action={formAction} className="space-y-5">
+      <input type="hidden" name="next" value={nextPath ?? ""} />
       {state.error ? (
         <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
           {state.error}
