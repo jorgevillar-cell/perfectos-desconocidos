@@ -1,5 +1,3 @@
-import { redirect } from "next/navigation";
-
 import { getCurrentUser } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ExploreScreenEntry as ExploreScreen } from "@/components/explore/explore-screen-entry";
@@ -9,6 +7,8 @@ import type { MatchCelebrationPayload } from "@/lib/chat/types";
 
 type DbUser = {
   id: string;
+  tipo_usuario: string | null;
+  verificado: boolean | null;
   nombre: string;
   edad: number;
   ciudad: string;
@@ -49,12 +49,19 @@ type DbUser = {
         direccion: string | null;
         descripcion: string;
         fotos: string[];
+        companeros_piso:
+          | Array<{
+              nombre: string;
+              fotoUrl: string | null;
+            }>
+          | null;
       }>
     | null;
 };
 
 type BaseProfile = {
   id: string;
+  verificado: boolean;
   nombre: string;
   edad: number;
   ciudad: string;
@@ -75,6 +82,10 @@ type BaseProfile = {
   pisoDireccion: string | null;
   pisoCompaneros: number | null;
   pisoFotos: string[];
+  userType: "propietario" | "buscador";
+  companionCount: number;
+  companionNames: string[];
+  companionPhotos: string[];
   fotoUrl: string;
 };
 
@@ -105,6 +116,14 @@ function asProfile(profile: DbUser["perfil_convivencia"]) {
     return profile[0] ?? null;
   }
   return profile;
+}
+
+function cityFromAddress(address: string | null | undefined) {
+  const value = (address ?? "").trim();
+  if (!value) return null;
+
+  const parts = value.split(",").map((item) => item.trim()).filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : null;
 }
 
 function buildTags(profile: BaseProfile): [string, string, string] {
@@ -158,6 +177,10 @@ function fromDbToBase(user: DbUser): BaseProfile | null {
   if (!profile) return null;
 
   const primaryPiso = user.pisos?.[0] ?? null;
+  const hasPublishedPiso = (user.pisos?.length ?? 0) > 0;
+  const derivedPisoCity = cityFromAddress(primaryPiso?.direccion);
+  const usesPisoCity = user.tipo_usuario === "propietario" || normalize(profile.situacion).includes("tengo_piso");
+  const effectiveCity = usesPisoCity && derivedPisoCity ? derivedPisoCity : user.ciudad;
 
   const rawHobbies = profile.aficiones ?? [];
   const esErasmus = rawHobbies.some((item) => normalize(item) === "erasmus");
@@ -165,10 +188,11 @@ function fromDbToBase(user: DbUser): BaseProfile | null {
 
   return {
     id: user.id,
+    verificado: Boolean(user.verificado),
     nombre: user.nombre,
     edad: user.edad,
-    ciudad: user.ciudad,
-    zona: profile.zonas?.[0] ?? user.ciudad,
+    ciudad: effectiveCity,
+    zona: primaryPiso?.zona ?? profile.zonas?.[0] ?? effectiveCity,
     universidad: profile.universidad,
     situacion: profile.situacion,
     estudiaOTrabaja: profile.estudiaOTrabaja,
@@ -180,11 +204,18 @@ function fromDbToBase(user: DbUser): BaseProfile | null {
     deporte: profile.deporte,
     aficiones: visibleHobbies,
     presupuesto: asNumber(profile.presupuesto),
-    tienePiso: (user.pisos?.length ?? 0) > 0 || normalize(profile.situacion).includes("tengo_piso"),
+    tienePiso: hasPublishedPiso,
     precioPiso: primaryPiso ? asNumber(primaryPiso.precio) : null,
     pisoDireccion: primaryPiso?.direccion ?? null,
     pisoCompaneros: parseCompanerosFromDescription(primaryPiso?.descripcion),
     pisoFotos: primaryPiso?.fotos ?? [],
+    userType:
+      user.tipo_usuario === "propietario" || normalize(profile.situacion).includes("tengo_piso")
+        ? "propietario"
+        : "buscador",
+    companionCount: (primaryPiso?.companeros_piso ?? []).length || parseCompanerosFromDescription(primaryPiso?.descripcion) || 0,
+    companionNames: (primaryPiso?.companeros_piso ?? []).map((item) => item.nombre).filter(Boolean),
+    companionPhotos: (primaryPiso?.companeros_piso ?? []).map((item) => item.fotoUrl ?? "").filter(Boolean),
     fotoUrl: (primaryPiso?.fotos?.[0] ?? user.fotoUrl) ?? "",
   };
 }
@@ -206,6 +237,7 @@ function fallbackProfiles(city: string): ExploreProfile[] {
   return getDemoProfiles().map((profile) => {
     const base: BaseProfile = {
       id: profile.id,
+      verificado: profile.verificado,
       nombre: profile.nombre,
       edad: profile.edad,
       ciudad: profile.ciudad,
@@ -226,6 +258,10 @@ function fallbackProfiles(city: string): ExploreProfile[] {
       pisoDireccion: profile.pisos[0]?.direccion ?? null,
       pisoCompaneros: parseCompanerosFromDescription(profile.pisos[0]?.descripcion ?? null),
       pisoFotos: profile.pisos[0]?.fotos ?? [],
+      userType: profile.situacion.includes("tengo_piso") ? "propietario" : "buscador",
+      companionCount: parseCompanerosFromDescription(profile.pisos[0]?.descripcion ?? null) || 0,
+      companionNames: [],
+      companionPhotos: [],
       fotoUrl: profile.fotoUrl,
     };
 
@@ -245,27 +281,26 @@ export default async function ExplorePage({
 }) {
   const authUser = await getCurrentUser();
 
-  if (!authUser) {
-    redirect("/login");
-  }
+  const query = await searchParams;
+  const initialCityFromQuery = firstQueryValue(query.ciudad);
 
   const supabase = await createSupabaseServerClient();
 
   const { data: dbUsers } = await supabase
     .from("users")
     .select(
-      "id,nombre,edad,ciudad,fotoUrl,perfil_convivencia(situacion,estudiaOTrabaja,universidad,presupuesto,zonas,fumar,mascotas,horario,ambiente,deporte,aficiones),pisos(id,precio,zona,direccion,descripcion,fotos)",
+      "id,tipo_usuario,verificado,nombre,edad,ciudad,fotoUrl,perfil_convivencia(situacion,estudiaOTrabaja,universidad,presupuesto,zonas,fumar,mascotas,horario,ambiente,deporte,aficiones),pisos(id,precio,zona,direccion,descripcion,fotos,companeros_piso(nombre,fotoUrl))",
     )
     .limit(120);
 
   const users = (dbUsers as DbUser[] | null) ?? [];
-  const myDbUser = users.find((candidate) => candidate.id === authUser.id) ?? null;
+  const myDbUser = authUser ? users.find((candidate) => candidate.id === authUser.id) ?? null : null;
   const myProfile = myDbUser ? fromDbToBase(myDbUser) : null;
 
-  const initialCity = myDbUser?.ciudad ?? "Madrid";
+  const initialCity = initialCityFromQuery || myDbUser?.ciudad || "Madrid";
 
   const realProfiles = users
-    .filter((candidate) => candidate.id !== authUser.id)
+    .filter((candidate) => (authUser ? candidate.id !== authUser.id : true))
     .map(fromDbToBase)
     .filter((candidate): candidate is BaseProfile => candidate !== null)
     .map((candidate) => toExploreProfile(candidate, compatibilidad(myProfile, candidate)))
@@ -273,19 +308,8 @@ export default async function ExplorePage({
 
   const hasRealProfiles = realProfiles.length > 0;
   const initialProfiles = hasRealProfiles ? realProfiles : fallbackProfiles(initialCity);
-  const initialCityForExplore = hasRealProfiles ? initialCity : "";
-  const currentUserPrimaryPiso = myDbUser?.pisos?.[0]
-    ? {
-        id: myDbUser.pisos[0].id,
-        precio: asNumber(myDbUser.pisos[0].precio),
-        zona: myDbUser.pisos[0].zona,
-        direccion: myDbUser.pisos[0].direccion,
-        descripcion: myDbUser.pisos[0].descripcion,
-        fotos: myDbUser.pisos[0].fotos ?? [],
-      }
-    : null;
+  const initialCityForExplore = initialCity;
 
-  const query = await searchParams;
   const openChatWithUserId = firstQueryValue(query.chatWith) || null;
   const celebrate = firstQueryValue(query.celebrate) === "1";
 
@@ -301,14 +325,13 @@ export default async function ExplorePage({
 
   return (
     <ExploreScreen
-      currentUserId={authUser.id}
-      currentUserName={myDbUser?.nombre ?? authUser.email ?? "Usuario"}
-      currentUserHasPiso={Boolean(currentUserPrimaryPiso)}
-      currentUserPrimaryPiso={currentUserPrimaryPiso}
+      isAuthenticated={Boolean(authUser)}
+      currentUserId={authUser?.id ?? "guest"}
+      currentUserName={myDbUser?.nombre ?? authUser?.email ?? "Invitado"}
       initialCity={initialCityForExplore}
       initialProfiles={initialProfiles}
-      openChatWithUserId={openChatWithUserId}
-      initialCelebration={celebrationPayload}
+      openChatWithUserId={authUser ? openChatWithUserId : null}
+      initialCelebration={authUser ? celebrationPayload : null}
     />
   );
 }

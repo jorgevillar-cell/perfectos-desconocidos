@@ -1,5 +1,7 @@
 # Perfectos Desconocidos - Sistema de pagos con Stripe Connect
 
+> Estado actual: pagos desactivados temporalmente en producto. Los precios se muestran solo de forma informativa y no se permiten cobros desde la plataforma.
+
 ## Objetivo
 
 Permitir que un propietario conectado con Stripe Connect solicite y reciba el pago del primer mes de alquiler dentro de la plataforma, con custodia temporal, gestión de incidencias y liberación automática.

@@ -9,6 +9,7 @@ datasource db {
 model User {
   id                   String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   email                String             @unique
+  tipoUsuario          String             @default("buscador") @map("tipo_usuario")
   nombre               String
   edad                 Int
   pais                 String
@@ -63,9 +64,28 @@ model Piso {
   fotos           String[]
   gastosIncluidos Boolean
   propietario     User     @relation("PisoPropietario", fields: [propietarioId], references: [id], onDelete: Cascade)
+  companeros      CompaneroPiso[]
 
   @@index([propietarioId])
   @@map("pisos")
+}
+
+model CompaneroPiso {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  pisoId          String   @db.Uuid
+  nombre          String
+  fotoUrl         String?
+  edad            Int?
+  estudiaOTrabaja String?
+  horario         String?
+  fumar           String?
+  mascotas        String?
+  ambiente        String?
+  descripcion     String?
+  piso            Piso     @relation(fields: [pisoId], references: [id], onDelete: Cascade)
+
+  @@index([pisoId])
+  @@map("companeros_piso")
 }
 
 model Match {

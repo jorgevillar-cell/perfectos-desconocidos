@@ -3,6 +3,7 @@ create extension if not exists pgcrypto;
 create table if not exists public.users (
   id uuid primary key default gen_random_uuid(),
   email text not null unique,
+  tipo_usuario text not null default 'buscador',
   nombre text not null,
   edad integer not null check (edad >= 0),
   pais text not null,
@@ -44,6 +45,20 @@ create table if not exists public.pisos (
   "disponibleDesde" date not null,
   fotos text[] not null default '{}'::text[],
   "gastosIncluidos" boolean not null default false
+);
+
+create table if not exists public.companeros_piso (
+  id uuid primary key default gen_random_uuid(),
+  "pisoId" uuid references public.pisos(id) on delete cascade,
+  nombre text not null,
+  "fotoUrl" text,
+  edad integer,
+  "estudiaOTrabaja" text,
+  horario text,
+  fumar text,
+  mascotas text,
+  ambiente text,
+  descripcion text
 );
 
 create table if not exists public.matches (
@@ -95,6 +110,7 @@ create table if not exists public.incidencias (
 );
 
 create index if not exists pisos_propietario_id_idx on public.pisos ("propietarioId");
+create index if not exists companeros_piso_piso_id_idx on public.companeros_piso ("pisoId");
 create index if not exists matches_usuario_a_id_idx on public.matches ("usuarioAId");
 create index if not exists matches_usuario_b_id_idx on public.matches ("usuarioBId");
 create index if not exists mensajes_match_id_idx on public.mensajes ("matchId");

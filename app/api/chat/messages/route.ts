@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { supabase } from "@/lib/supabase";
 import { pusherServer } from "@/lib/chat/pusher-server";
+import { sendNewChatMessageEmail } from "@/lib/notifications/email";
 
 type MatchRow = {
   id: string;
@@ -82,6 +83,36 @@ export async function POST(request: Request) {
     userId: user.id,
     isTyping: false,
   });
+
+  try {
+    const recipientUserId = matchData.usuarioAId === user.id ? matchData.usuarioBId : matchData.usuarioAId;
+    const { data: recipientUser } = await supabase
+      .from("users")
+      .select("email")
+      .eq("id", recipientUserId)
+      .maybeSingle<{ email: string | null }>();
+
+    const { data: senderUser } = await supabase
+      .from("users")
+      .select("nombre")
+      .eq("id", user.id)
+      .maybeSingle<{ nombre: string | null }>();
+
+    const recipientEmail = recipientUser?.email?.trim();
+    if (recipientEmail) {
+      const appUrl = process.env.NEXT_PUBLIC_SITE_URL ?? process.env.SITE_URL ?? "http://localhost:3000";
+      const senderName = senderUser?.nombre?.trim() || "Tu contacto";
+
+      await sendNewChatMessageEmail({
+        to: [recipientEmail],
+        senderName,
+        messagePreview: content,
+        chatUrl: `${appUrl}/explore?chatWith=${user.id}&matchId=${matchId}`,
+      });
+    }
+  } catch (emailError) {
+    console.error("[chat:message-email:error]", emailError);
+  }
 
   return NextResponse.json({ ok: true, message: payload });
 }

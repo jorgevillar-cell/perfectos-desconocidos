@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { supabase } from "@/lib/supabase";
 
 type Payload = {
+  tipoUsuario?: "propietario" | "buscador";
   nombre: string;
   edad: number;
   pais: string;
@@ -36,6 +37,18 @@ type Payload = {
   pisoGastosIncluidos: boolean;
   pisoFotosDataUrls: string[];
   pisoDescripcion: string;
+  viveConCompaneros?: boolean;
+  companeros?: Array<{
+    nombre: string;
+    fotoDataUrl?: string;
+    edad: number;
+    estudiaOTrabaja: string;
+    horario: string;
+    fumar: string;
+    mascotas: string;
+    ambiente: string;
+    descripcion?: string;
+  }>;
   telefono: string;
   telefonoVerificado: boolean;
 };
@@ -97,6 +110,7 @@ export async function POST(request: Request) {
 
   try {
     const body = (await request.json()) as Payload;
+    const userType = body.tipoUsuario === "propietario" ? "propietario" : "buscador";
 
     await ensureBucket();
 
@@ -125,6 +139,7 @@ export async function POST(request: Request) {
       estadoCivil: body.estadoCivil || "prefiero_no_decir",
       fotoUrl: profilePhotoUrl,
       bio: body.bio,
+      tipo_usuario: userType,
       verificado: Boolean(body.telefonoVerificado),
       creadoEn: new Date().toISOString(),
     };
@@ -177,11 +192,57 @@ export async function POST(request: Request) {
         gastosIncluidos: Boolean(body.pisoGastosIncluidos),
       };
 
-      const { error: pisoError } = await supabase.from("pisos").insert(pisoPayload);
+      const { data: insertedPiso, error: pisoError } = await supabase
+        .from("pisos")
+        .insert(pisoPayload)
+        .select("id")
+        .single();
       if (pisoError) {
         throw new Error(pisoError.message);
       }
+
+      if (insertedPiso?.id) {
+        await supabase.from("companeros_piso").delete().eq("pisoId", insertedPiso.id);
+
+        const companions = (body.companeros ?? []).filter((item) => item.nombre?.trim());
+        if (body.viveConCompaneros && companions.length) {
+          const companionsPayload = await Promise.all(
+            companions.slice(0, 4).map(async (item, index) => {
+              let companionPhotoUrl: string | null = null;
+
+              if (item.fotoDataUrl?.trim()) {
+                companionPhotoUrl = await uploadDataUrl(
+                  `companeros/${user.id}/${insertedPiso.id}/comp-${index + 1}.jpg`,
+                  item.fotoDataUrl,
+                );
+              }
+
+              return {
+                pisoId: insertedPiso.id,
+                nombre: item.nombre.trim(),
+                fotoUrl: companionPhotoUrl,
+                edad: item.edad,
+                estudiaOTrabaja: item.estudiaOTrabaja,
+                horario: item.horario,
+                fumar: item.fumar,
+                mascotas: item.mascotas,
+                ambiente: item.ambiente,
+                descripcion: item.descripcion?.trim() || null,
+              };
+            }),
+          );
+
+          const { error: companionsError } = await supabase.from("companeros_piso").insert(companionsPayload);
+          if (companionsError) {
+            throw new Error(companionsError.message);
+          }
+        }
+      }
     } else {
+      const { data: existingPisos } = await supabase.from("pisos").select("id").eq("propietarioId", user.id);
+      for (const piso of existingPisos ?? []) {
+        await supabase.from("companeros_piso").delete().eq("pisoId", piso.id);
+      }
       await supabase.from("pisos").delete().eq("propietarioId", user.id);
     }
 

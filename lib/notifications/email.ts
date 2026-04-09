@@ -39,6 +39,13 @@ type WelcomeEmailPayload = {
   name: string;
 };
 
+type NewChatMessageEmailPayload = {
+  to: string[];
+  senderName: string;
+  messagePreview: string;
+  chatUrl: string;
+};
+
 type TenantPaymentSuccessEmailPayload = {
   to: string[];
   payment: PaymentSummary;
@@ -335,6 +342,45 @@ export async function sendWelcomeEmail(payload: WelcomeEmailPayload) {
     logEmailError("sendWelcomeEmail", error, {
       to: payload.to,
       name: payload.name,
+    });
+  }
+}
+
+export async function sendNewChatMessageEmail(payload: NewChatMessageEmailPayload) {
+  try {
+    const subject = `Nuevo mensaje de ${payload.senderName} en Perfectos Desconocidos`;
+    const preview = payload.messagePreview.trim().slice(0, 180);
+    const html = renderLayout(
+      subject,
+      `
+      <tr>
+        <td style="padding:12px 40px 0 40px; font-family:Arial,sans-serif; color:${TEXT_PRIMARY};">
+          <p style="margin:0; font-size:24px; font-weight:700;">Tienes un nuevo mensaje</p>
+          <p style="margin:12px 0 0 0; font-size:15px; line-height:1.7; color:${TEXT_SECONDARY};">
+            ${escapeHtml(payload.senderName)} te ha escrito en el chat.
+          </p>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:20px 40px 0 40px; font-family:Arial,sans-serif;">
+          <div style="border-left:4px solid ${PRIMARY}; background:#FFF9F8; padding:14px 16px; font-size:15px; line-height:1.7; color:${TEXT_PRIMARY}; white-space:pre-wrap;">
+            ${escapeHtml(preview || "Tienes un nuevo mensaje en tu chat.")}
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:22px 40px 0 40px; text-align:center; font-family:Arial,sans-serif;">
+          <a href="${payload.chatUrl}" style="display:inline-block; border-radius:8px; background:${PRIMARY}; color:#FFFFFF; text-decoration:none; padding:14px 28px; font-size:16px; font-weight:700;">Abrir chat</a>
+        </td>
+      </tr>
+    `,
+    );
+
+    await safeSend({ to: payload.to, subject, html });
+  } catch (error) {
+    logEmailError("sendNewChatMessageEmail", error, {
+      to: payload.to,
+      senderName: payload.senderName,
     });
   }
 }

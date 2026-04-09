@@ -29,10 +29,10 @@ async function proxyHandler(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isAuthPage = pathname === "/login" || pathname === "/register";
   const isProtectedPage =
-    pathname === "/explore" ||
     pathname === "/onboarding" ||
     pathname.startsWith("/settings") ||
     pathname.startsWith("/payment");
+  const requiresAuthCheck = isAuthPage || isProtectedPage;
 
   const supabaseConfig = getSupabaseProxyConfig();
   if (!supabaseConfig.isConfigured) {
@@ -44,6 +44,10 @@ async function proxyHandler(request: NextRequest) {
   }
 
   let user: { id: string } | null = null;
+
+  if (!requiresAuthCheck) {
+    return response;
+  }
 
   try {
     const supabase = createServerClient(supabaseConfig.url!, supabaseConfig.key!, {
@@ -71,7 +75,15 @@ async function proxyHandler(request: NextRequest) {
       return redirectResponse;
     }
   } catch (error) {
-    console.error("Proxy auth check failed", error);
+    const isRefreshNotFound =
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error as { code?: string }).code === "refresh_token_not_found";
+
+    if (!isRefreshNotFound) {
+      console.error("Proxy auth check failed", error);
+    }
   }
 
   if (isProtectedPage && !user) {
@@ -89,5 +101,5 @@ export { proxyHandler as proxy };
 export default proxyHandler;
 
 export const config = {
-  matcher: ["/login", "/register", "/onboarding", "/explore", "/settings/:path*", "/payment/:path*", "/"],
+  matcher: ["/login", "/register", "/onboarding", "/settings/:path*", "/payment/:path*"],
 };

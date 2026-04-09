@@ -1,0 +1,218 @@
+﻿PERFECTOS DESCONOCIDOS
+Prompt para la IA de VS Code â€” SesiÃ³n 4B
+RediseÃ±o de navegaciÃ³n, home pÃºblica, onboarding diferenciado y fichas de perfil
+1. Contexto y punto de partida
+Trabajas en Perfectos Desconocidos, una plataforma web en producciÃ³n para encontrar compaÃ±eros de piso compatibles. EstÃ¡ construida con Next.js 14, TypeScript, Tailwind CSS, Supabase Auth, Pusher para chat y Stripe Connect para pagos. EstÃ¡ desplegada en Vercel en perfectos-desconocidos-5hgb.vercel.app.
+En esta sesiÃ³n vas a hacer cambios importantes de producto que afectan a la navegaciÃ³n, la home, el registro y el onboarding. Son cambios de UX significativos, no parches pequeÃ±os. Por eso es crÃ­tico seguir el orden de pasos y verificar cada uno antes de continuar.
+2. Resumen de todos los cambios
+Estos son los cinco bloques de cambios ordenados de menor a mayor impacto en el sistema:
+PASO 1 â€” Nueva home pÃºblica
+QuÃ© debe tener esta pÃ¡gina
+Barra de navegaciÃ³n superior:
+Logo 'Perfectos Desconocidos' en coral a la izquierda
+A la derecha: dos botones â€” 'Iniciar sesiÃ³n' (outline, sin relleno) y 'Crear cuenta' (relleno coral)
+La barra es fija en la parte superior, fondo blanco, sombra muy suave
+SecciÃ³n hero (parte principal visible sin scroll):
+Eslogan principal grande: 'Encuentra tu piso ideal. Y las personas ideales con las que vivirlo.'
+SubtÃ­tulo mÃ¡s pequeÃ±o: 'No buscamos habitaciones. Buscamos compatibilidad. Tu forma de vivir merece compaÃ±eros que encajen contigo.'
+Buscador de ciudad: input con placeholder 'Escribe una ciudad...' y botÃ³n 'Buscar' en coral
+Cuando el usuario escribe y pulsa Buscar, se le lleva a /explore?ciudad=X (sin necesidad de cuenta)
+SecciÃ³n de cÃ³mo funciona (justo debajo del hero, visible al hacer scroll):
+TÃ­tulo: 'AsÃ­ funciona Perfectos Desconocidos'
+Tres bloques en fila horizontal, cada uno con icono, tÃ­tulo corto y descripciÃ³n de 2 lÃ­neas:
+  Bloque 1 â€” Icono de lupa. TÃ­tulo: 'Explora perfiles'. Texto: 'Busca personas compatibles con tu forma de vivir en tu ciudad.'
+  Bloque 2 â€” Icono de mensaje. TÃ­tulo: 'Conecta con compatibles'. Texto: 'Solicita contacto con un mensaje personal. Sin spam, sin anÃ³nimos.'
+  Bloque 3 â€” Icono de llave. TÃ­tulo: 'Encuentra tu sitio'. Texto: 'Habla, conoceos y da el paso con seguridad. El primer mes protegido.'
+Lo que NO debe hacer esta pÃ¡gina
+NO redirigir automÃ¡ticamente a /login si el usuario no estÃ¡ logueado
+NO mostrar el menÃº lateral de iconos (ese es solo para usuarios dentro de la app)
+NO usar 'use client' si es posible â€” intentar que sea Server Component o mÃ­nimo client solo donde haga falta el input del buscador
+VerificaciÃ³n del paso 1
+Entrar a la URL raÃ­z sin estar logueado y ver la landing
+El buscador funciona y lleva a /explore?ciudad=Barcelona
+Los botones de Iniciar sesiÃ³n y Crear cuenta llevan a /login y /register
+La pÃ¡gina se ve bien en desktop (no hace falta mÃ³vil por ahora)
+PASO 2 â€” MenÃº lateral visible siempre
+Comportamiento sin sesiÃ³n
+El menÃº lateral de iconos sigue siendo la barra de 64px fija a la derecha
+En lugar de perfil, chat y ajustes, muestra solo dos iconos: 'Iniciar sesiÃ³n' y 'Crear cuenta'
+Al pulsar cualquiera de los dos lleva a /login o /register
+No se muestra el badge de mensajes no leÃ­dos (no hay sesiÃ³n)
+Comportamiento con sesiÃ³n
+Exactamente igual que ahora: perfil, chat con badge, notificaciones y ajustes
+No cambiar nada del comportamiento actual con sesiÃ³n
+DÃ³nde estÃ¡ el componente
+Busca el componente del dock lateral. SegÃºn los archivos del proyecto es: components/chat/chat-dock.tsx
+Para saber si hay sesiÃ³n usa el hook de Supabase del cliente: const { data: { session } } = await supabase.auth.getSession() o el equivalente que ya se use en ese componente.
+VerificaciÃ³n del paso 2
+Sin sesiÃ³n: se ve el menÃº lateral con opciones de login y registro
+Con sesiÃ³n: se ve el menÃº lateral normal con chat y perfil
+El menÃº aparece en /explore aunque no haya sesiÃ³n
+PASO 3 â€” ExploraciÃ³n y fichas sin cuenta
+Cambios en /explore
+Eliminar cualquier redirect a /login si el usuario no estÃ¡ autenticado
+Los perfiles de demo ya existentes se siguen mostrando si no hay usuarios reales
+Los filtros y el mapa funcionan igual para todos
+La Ãºnica diferencia: si el usuario sin sesiÃ³n pincha en una tarjeta y llega a la ficha, el botÃ³n de 'Solicitar contacto' estÃ¡ desactivado o muestra un modal pidiendo que se registre
+Cambios en /profile/[id]
+La ficha completa es visible para todos sin necesidad de cuenta
+El botÃ³n 'Solicitar contacto' en la parte inferior: si no hay sesiÃ³n, al pulsarlo aparece un modal o toast que dice 'Para contactar con esta persona necesitas crear una cuenta. Es gratis y solo tarda 2 minutos.' con dos botones: 'Crear cuenta' y 'Iniciar sesiÃ³n'
+El botÃ³n 'Pasar' tambiÃ©n funciona sin sesiÃ³n (simplemente vuelve a explorar)
+La tarjeta expandida del mapa tambiÃ©n muestra el botÃ³n 'Enviar mensaje' como estÃ¡ ahora, pero igual â€” si no hay sesiÃ³n, abre el mismo modal
+VerificaciÃ³n del paso 3
+Sin sesiÃ³n se puede entrar a /explore y ver todos los perfiles
+Sin sesiÃ³n se puede abrir la ficha completa de un perfil
+Sin sesiÃ³n el botÃ³n de Solicitar contacto muestra el modal de registro
+Con sesiÃ³n todo funciona exactamente igual que antes
+PASO 4 â€” Registro con bifurcaciÃ³n y onboarding diferenciado
+4A â€” Cambio en la pantalla de registro (/register)
+Antes de pedir email y contraseÃ±a, aÃ±adir una pantalla previa (o una secciÃ³n en la misma pÃ¡gina) que pregunta:
+TÃ­tulo: 'Â¿QuÃ© describes mejor tu situaciÃ³n?'
+OpciÃ³n A â€” botÃ³n o card grande: 'Tengo un piso y busco compaÃ±ero' â€” icono de casa
+OpciÃ³n B â€” botÃ³n o card grande: 'Busco piso o compaÃ±eros' â€” icono de lupa
+La elecciÃ³n se guarda en el estado local y determina quÃ© onboarding se lanza despuÃ©s del registro
+DespuÃ©s de elegir, se muestra el formulario normal de email y contraseÃ±a
+Al crear la cuenta, guardar el tipo en la tabla users con un campo nuevo: tipo_usuario con valores 'propietario' o 'buscador'
+4B â€” Onboarding del BUSCADOR
+Es prÃ¡cticamente igual al onboarding actual. El Ãºnico cambio es eliminar la opciÃ³n 'Tengo piso libre' del campo situaciÃ³n, ya que ahora eso se hace por el flujo de propietario. Las opciones de situaciÃ³n quedan:
+'Busco habitaciÃ³n en un piso ya formado'
+'Quiero buscar piso con alguien compatible'
+El resto del onboarding del buscador se mantiene igual: forma de vivir, hÃ¡bitos, presupuesto, zonas preferidas y carta de presentaciÃ³n.
+4C â€” Onboarding del PROPIETARIO
+Es completamente nuevo y tiene tres bloques en orden:
+BLOQUE 1 del propietario â€” Datos del piso
+Fotos del piso â€” dropzone igual al actual, hasta 6 fotos
+Precio de la habitaciÃ³n â€” nÃºmero en euros al mes
+Â¿Los gastos estÃ¡n incluidos? â€” toggle sÃ­/no
+DirecciÃ³n â€” ciudad + calle con autocompletado Mapbox
+DescripciÃ³n del piso â€” texto libre, mÃ¡ximo 400 caracteres. Placeholder: 'Describe el ambiente del piso, las zonas comunes, el barrio...'
+Normas del piso â€” texto libre, mÃ¡ximo 300 caracteres. Placeholder: 'Horarios de silencio, polÃ­tica de visitas, limpieza...'
+Disponible desde â€” selector de fecha
+BLOQUE 2 del propietario â€” Tu perfil personal
+Exactamente los mismos campos del onboarding actual de cualquier usuario: quiÃ©n eres, tus hÃ¡bitos de convivencia, horario, fumar, mascotas, ambiente, aficiones y carta de presentaciÃ³n. El propietario tambiÃ©n es una persona y el buscador necesita saber con quiÃ©n va a vivir.
+BLOQUE 3 del propietario â€” Perfiles de compaÃ±eros actuales
+Este bloque es nuevo. Solo aparece si el propietario indica que ya vive con mÃ¡s personas en el piso.
+Pregunta: 'Â¿Ya vives con alguien en el piso?' â€” toggle sÃ­/no
+Si dice sÃ­: aparece un botÃ³n 'AÃ±adir compaÃ±ero'
+Por cada compaÃ±ero se abre un mini formulario con estos campos:
+  â€” Nombre (solo nombre, no apellido)
+  â€” Edad
+  â€” Â¿Estudia o trabaja? â€” selector
+  â€” Horario â€” diurno, normal o nocturno
+  â€” Fuma â€” sÃ­, no, solo fuera
+  â€” Mascotas â€” tiene, acepta, no acepta
+  â€” Ambiente â€” tranquilo, equilibrado, social
+  â€” DescripciÃ³n breve opcional â€” mÃ¡ximo 150 caracteres
+Se pueden aÃ±adir hasta 4 compaÃ±eros
+Cada compaÃ±ero aÃ±adido aparece como una tarjeta resumen con su nombre y datos, con opciÃ³n de editar o eliminar
+DÃ³nde guardar los compaÃ±eros en la base de datos:
+Crear tabla nueva en Supabase: companeros_piso
+Campos: id (uuid), pisoId (uuid FK a pisos.id), nombre (text), edad (integer), estudiaOTrabaja (text), horario (text), fumar (text), mascotas (text), ambiente (text), descripcion (text nullable)
+Ejecutar en SQL Editor de Supabase:
+CREATE TABLE IF NOT EXISTS companeros_piso (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  pisoId uuid REFERENCES pisos(id) ON DELETE CASCADE,
+  nombre text NOT NULL,
+  edad integer,
+  estudiaOTrabaja text,
+  horario text,
+  fumar text,
+  mascotas text,
+  ambiente text,
+  descripcion text
+);
+VerificaciÃ³n del paso 4
+Al pulsar 'Crear cuenta' aparece primero la selecciÃ³n de tipo de usuario
+El flujo de buscador no tiene la opciÃ³n 'tengo piso libre'
+El flujo de propietario tiene los tres bloques en orden
+Los compaÃ±eros se guardan en la tabla companeros_piso
+El campo tipo_usuario existe en la tabla users
+PASO 5 â€” Fichas de perfil diferenciadas
+Los cuatro casos posibles y cÃ³mo se ven
+CASO A â€” Perfil buscador
+Tarjeta en exploraciÃ³n:
+Foto de perfil, nombre, edad, ciudad
+Badge 'Busca habitaciÃ³n' o 'Busca compaÃ±ero' segÃºn su situaciÃ³n
+Presupuesto mÃ¡ximo en la esquina superior derecha
+Chips de hÃ¡bitos principales: horario, fuma, mascotas
+Barra de compatibilidad
+Ficha completa:
+GalerÃ­a vacÃ­a o sin secciÃ³n de fotos de piso â€” no tiene piso
+SecciÃ³n 'Sobre mÃ­' con su presentaciÃ³n
+SecciÃ³n 'Estilo de convivencia' con sus hÃ¡bitos
+SecciÃ³n 'Lo que busca' con su presupuesto y zonas preferidas
+Sin secciÃ³n de compaÃ±eros â€” no aplica
+CASO B â€” Propietario sin compaÃ±eros
+Tarjeta en exploraciÃ³n:
+Foto del piso como imagen principal (si tiene), o foto de perfil
+Badge 'Tiene piso libre'
+Precio de la habitaciÃ³n destacado en la esquina
+Zona del piso
+Chips de hÃ¡bitos del propietario
+Barra de compatibilidad
+Ficha completa:
+GalerÃ­a de fotos del piso arriba
+Precio, zona y disponibilidad
+SecciÃ³n de normas del piso
+SecciÃ³n 'El propietario' con foto, nombre, hÃ¡bitos del propietario
+Sin secciÃ³n de compaÃ±eros â€” vive solo
+CASO C â€” Propietario con compaÃ±eros
+Tarjeta en exploraciÃ³n:
+Igual que el caso B
+AÃ±adir un indicador pequeÃ±o: 'VivirÃ¡s con N personas mÃ¡s'
+Ficha completa:
+GalerÃ­a de fotos del piso arriba
+Precio, zona y disponibilidad
+SecciÃ³n de normas del piso
+SecciÃ³n 'El propietario' con sus datos personales y hÃ¡bitos
+SecciÃ³n nueva 'Con quiÃ©n vivirÃ¡s' â€” una tarjeta horizontal por cada compaÃ±ero con: nombre, edad, chips de horario, fumar, mascotas y ambiente, y descripciÃ³n breve si la tiene
+Esta secciÃ³n va entre las normas y el propietario, o justo despuÃ©s del propietario
+CASO D â€” Propietario con compaÃ±eros pero sin fotos del piso
+Igual que el caso C pero sin galerÃ­a de fotos
+En lugar de la galerÃ­a mostrar un bloque gris claro con texto: 'Este propietario no ha aÃ±adido fotos del piso todavÃ­a'
+Tarjeta expandida del mapa â€” diferencias por tipo
+La tarjeta que aparece al pinchar en un pin del mapa o en una tarjeta (como en la imagen 1 que se ve en el contexto):
+Para buscador: foto de perfil a la izquierda, mapa de zona abajo, datos personales y hÃ¡bitos a la derecha
+Para propietario: foto del piso a la izquierda (si tiene), precio destacado arriba a la derecha, zona, hÃ¡bitos del propietario y si tiene compaÃ±eros un texto pequeÃ±o 'VivirÃ¡s con N personas' con los nombres
+Tab de Compatibilidad en la ficha completa
+Cuando el perfil es un propietario con compaÃ±eros, el tab de Compatibilidad debe mostrar dos secciones:
+SecciÃ³n 1: 'Compatibilidad con el propietario' â€” el desglose actual de coincidencias y puntos a revisar
+SecciÃ³n 2: 'Compatibilidad con los compaÃ±eros' â€” por cada compaÃ±ero, su nombre y un desglose simplificado de los campos que coinciden y los que no (horario, fumar, mascotas, ambiente)
+DÃ³nde hacer los cambios
+app/(app)/profile/[id]/page.tsx â€” lÃ³gica condicional segÃºn tipo_usuario y si tiene companeros_piso
+components/explore/explore-screen.tsx â€” tarjetas y tarjeta expandida
+La consulta de perfil debe hacer JOIN con companeros_piso para traer los compaÃ±eros si existen
+// En la consulta del perfil aÃ±adir:
+supabase.from('users')
+  .select('*, perfil_convivencia(*), pisos(*, companeros_piso(*)))')
+  .eq('id', userId)
+  .maybeSingle()
+VerificaciÃ³n del paso 5
+Un perfil buscador no muestra secciÃ³n de piso ni de compaÃ±eros
+Un perfil propietario sin compaÃ±eros muestra el piso pero sin secciÃ³n 'Con quiÃ©n vivirÃ¡s'
+Un perfil propietario con compaÃ±eros muestra el piso y la secciÃ³n de compaÃ±eros con sus tarjetas
+Si no hay fotos del piso se muestra el bloque gris con el aviso
+El tab de Compatibilidad muestra la secciÃ³n de compaÃ±eros si los hay
+Orden de verificaciÃ³n final antes del deploy
+Una vez completados los 5 pasos, verifica este flujo completo de principio a fin:
+Entrar a la URL raÃ­z sin sesiÃ³n â€” ver la home pÃºblica con eslogan y buscador
+Buscar 'Barcelona' â€” llegar a /explore con perfiles visibles sin cuenta
+Ver el menÃº lateral a la derecha con opciones de login/registro
+Pinchar en un perfil buscador â€” ver la ficha completa
+Pulsar 'Solicitar contacto' â€” ver el modal pidiendo que te registres
+Pulsar 'Crear cuenta' â€” ver la selecciÃ³n de tipo de usuario
+Elegir 'Tengo un piso' â€” completar el onboarding de propietario con los tres bloques
+AÃ±adir un compaÃ±ero en el bloque 3 â€” ver que se guarda
+Ir a /explore y ver el perfil del propietario reciÃ©n creado con el piso y el compaÃ±ero
+Abrir la ficha del propietario â€” ver la secciÃ³n 'Con quiÃ©n vivirÃ¡s'
+Volver a crear otra cuenta como buscador â€” onboarding sin la opciÃ³n 'tengo piso libre'
+Abrir la ficha del propietario con la cuenta de buscador â€” ver el tab Compatibilidad con los dos bloques
+Hacer git add . git commit -m 'feat: home publica, onboarding diferenciado y fichas por tipo' git push
+Lo que NO debes tocar en ningÃºn caso
+El sistema de chat con Pusher â€” no modificar chat-dock.tsx mÃ¡s allÃ¡ del menÃº lateral
+El sistema de pagos con Stripe Connect â€” no tocar nada de /api/stripe ni /payment
+El sistema de emails con Resend â€” no tocar lib/notifications/email.ts
+El sistema de solicitudes de contacto â€” la lÃ³gica de matches ya funciona, no cambiarla
+El panel de administraciÃ³n /admin â€” no tocarlo
+Los webhooks de Stripe â€” no tocarlos
+Perfectos Desconocidos â€” Prompt SesiÃ³n 4B â€” Abril 2026

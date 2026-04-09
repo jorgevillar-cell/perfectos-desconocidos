@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import type { ChatMessage } from "@/lib/chat/types";
 import { formatMoney } from "@/lib/stripe";
 
@@ -21,8 +19,6 @@ export function PaymentMessageCard({ message, mine }: { message: ChatMessage; mi
   };
 
   const amount = Number(payload.amount ?? 0);
-  const canPayNow = payload.status === "pendiente" || message.kind === "payment_request";
-
   return (
     <div className={`rounded-2xl border ${mine ? "border-[#FFD3D3] bg-[#FFF8F8]" : "border-[#FFE5E5] bg-white"} p-4 shadow-[0_4px_14px_rgba(0,0,0,0.05)]`}>
       <div className="flex items-start gap-3">
@@ -46,14 +42,9 @@ export function PaymentMessageCard({ message, mine }: { message: ChatMessage; mi
           <p className="mt-1 text-[13px] text-[#6B7280]">Pago seguro con custodia de 48h</p>
           {payload.note ? <p className="mt-2 text-[13px] text-[#4B5563]">{payload.note}</p> : null}
 
-          {payload.paymentId && canPayNow ? (
-            <Link
-              href={payload.paymentUrl ?? `/payment/${payload.paymentId}`}
-              className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl bg-[#FF6B6B] px-4 text-[14px] font-semibold text-white transition active:scale-[0.99]"
-            >
-              Pagar ahora
-            </Link>
-          ) : null}
+          <p className="mt-4 text-[12px] font-semibold text-[#9CA3AF]">
+            Pagos temporalmente desactivados en la plataforma.
+          </p>
         </div>
       </div>
     </div>

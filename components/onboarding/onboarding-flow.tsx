@@ -8,6 +8,7 @@ import { ChipList, FooterActions, RadioGroup, SectionCard, SelectField, StepHead
 type Props = {
   userId: string;
   email: string;
+  userType: "propietario" | "buscador";
 };
 
 type Situacion = "tengo_piso_libre" | "busco_habitacion" | "buscar_juntos" | "";
@@ -28,6 +29,19 @@ type CitySuggestion = {
 type ZoneSuggestion = {
   id: string;
   label: string;
+};
+
+type CompanionForm = {
+  id: string;
+  nombre: string;
+  fotoDataUrl: string;
+  edad: number | "";
+  estudiaOTrabaja: "estudiante" | "trabajador" | "ambas" | "";
+  horario: "diurno" | "normal" | "nocturno" | "";
+  fumar: "si" | "no" | "solo_fuera" | "";
+  mascotas: "tengo" | "acepto" | "no_acepto" | "";
+  ambiente: "tranquilo" | "equilibrado" | "social" | "";
+  descripcion: string;
 };
 
 type OnboardingData = {
@@ -66,6 +80,8 @@ type OnboardingData = {
   pisoGastosIncluidos: boolean;
   pisoFotosDataUrls: string[];
   pisoDescripcion: string;
+  viveConCompaneros: boolean;
+  companeros: CompanionForm[];
   telefono: string;
   telefonoCodigoEnviado: string;
   telefonoCodigoInput: string;
@@ -259,6 +275,8 @@ const initialData: OnboardingData = {
   pisoGastosIncluidos: false,
   pisoFotosDataUrls: [],
   pisoDescripcion: "",
+  viveConCompaneros: false,
+  companeros: [],
   telefono: "",
   telefonoCodigoEnviado: "",
   telefonoCodigoInput: "",
@@ -338,7 +356,7 @@ function dataUrlToFile(dataUrl: string, fileName: string) {
   return new File([arrayBuffer], fileName, { type: mime });
 }
 
-export function OnboardingFlow({ userId, email }: Props) {
+export function OnboardingFlow({ userId, email, userType }: Props) {
   const router = useRouter();
   const storageKey = `${STORAGE_KEY_PREFIX}:${userId}`;
   const countryMenuRef = useRef<HTMLDivElement | null>(null);
@@ -382,6 +400,14 @@ export function OnboardingFlow({ userId, email }: Props) {
   const [languageQuery, setLanguageQuery] = useState("");
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
+  const isOwnerFlow = userType === "propietario";
+  const situationOptions = isOwnerFlow
+    ? [{ id: "tengo_piso_libre", label: "Tengo piso libre", desc: "Publica tu piso y encuentra match" }]
+    : [
+        { id: "busco_habitacion", label: "Busco habitacion", desc: "Quiero entrar a un piso existente" },
+        { id: "buscar_juntos", label: "Buscar juntos", desc: "Busco companero para buscar piso" },
+      ];
+
   useEffect(() => {
     const saved = localStorage.getItem(storageKey);
     if (!saved) return;
@@ -389,7 +415,14 @@ export function OnboardingFlow({ userId, email }: Props) {
     try {
       const parsed = JSON.parse(saved) as { step: number; data: OnboardingData };
       if (parsed?.data) {
-        setData({ ...initialData, ...parsed.data });
+        const merged = { ...initialData, ...parsed.data };
+        if (isOwnerFlow) {
+          merged.situacion = "tengo_piso_libre";
+        }
+        if (!isOwnerFlow && merged.situacion === "tengo_piso_libre") {
+          merged.situacion = "";
+        }
+        setData(merged);
       }
       if (parsed?.step && parsed.step >= 1 && parsed.step <= 4) {
         setStep(parsed.step);
@@ -397,7 +430,13 @@ export function OnboardingFlow({ userId, email }: Props) {
     } catch {
       localStorage.removeItem(storageKey);
     }
-  }, [storageKey]);
+  }, [isOwnerFlow, storageKey]);
+
+  useEffect(() => {
+    if (isOwnerFlow && data.situacion !== "tengo_piso_libre") {
+      setData((prev) => ({ ...prev, situacion: "tengo_piso_libre" }));
+    }
+  }, [data.situacion, isOwnerFlow]);
 
   useEffect(() => {
     localStorage.setItem(storageKey, JSON.stringify({ step, data }));
@@ -964,6 +1003,32 @@ export function OnboardingFlow({ userId, email }: Props) {
     if (currentStep === 4) {
       if (!data.bio.trim()) nextErrors.bio = "La presentacion es obligatoria";
       if (data.bio.length > 300) nextErrors.bio = "Maximo 300 caracteres";
+
+      if (isOwnerFlow && data.viveConCompaneros) {
+        if (!data.companeros.length) {
+          nextErrors.companeros = "Anade al menos un companero o marca que vives solo";
+        }
+
+        for (let i = 0; i < data.companeros.length; i += 1) {
+          const mate = data.companeros[i];
+          if (!mate.nombre.trim()) {
+            nextErrors.companeros = "Completa nombre y datos obligatorios de los companeros";
+            break;
+          }
+          if (!mate.fotoDataUrl) {
+            nextErrors.companeros = "Sube una foto para cada companero";
+            break;
+          }
+          if (mate.edad === "" || Number(mate.edad) < 16 || Number(mate.edad) > 99) {
+            nextErrors.companeros = "Revisa la edad de los companeros (16-99)";
+            break;
+          }
+          if (!mate.estudiaOTrabaja || !mate.horario || !mate.fumar || !mate.mascotas || !mate.ambiente) {
+            nextErrors.companeros = "Completa todos los campos clave de convivencia de cada companero";
+            break;
+          }
+        }
+      }
     }
 
     setErrors(nextErrors);
@@ -998,6 +1063,15 @@ export function OnboardingFlow({ userId, email }: Props) {
     if (!file) return;
     const dataUrl = await toDataUrl(file);
     setField("fotoPerfilDataUrl", dataUrl);
+  }
+
+  async function handleCompanionPhoto(companionId: string, file?: File | null) {
+    if (!file) return;
+    const dataUrl = await toDataUrl(file);
+    setField(
+      "companeros",
+      data.companeros.map((item) => (item.id === companionId ? { ...item, fotoDataUrl: dataUrl } : item)),
+    );
   }
 
   async function handlePisoFiles(files: FileList | null) {
@@ -1054,6 +1128,7 @@ export function OnboardingFlow({ userId, email }: Props) {
 
       const payload = {
         ...data,
+        tipoUsuario: userType,
         presupuestoMax,
         pisoPrecioAlquiler,
         pisoDireccion,
@@ -1307,11 +1382,7 @@ export function OnboardingFlow({ userId, email }: Props) {
               <div className="space-y-3">
                 <p className="text-sm font-semibold">Situacion</p>
                 <div className="grid gap-2 sm:grid-cols-3">
-                  {[
-                    { id: "tengo_piso_libre", label: "Tengo piso libre", desc: "Publica tu piso y encuentra match" },
-                    { id: "busco_habitacion", label: "Busco habitacion", desc: "Quiero entrar a un piso existente" },
-                    { id: "buscar_juntos", label: "Buscar juntos", desc: "Busco companero para buscar piso" },
-                  ].map((item) => (
+                  {situationOptions.map((item) => (
                     <button key={item.id} type="button" className={cardClass(data.situacion === item.id, Boolean(errors.situacion))} onClick={() => setField("situacion", item.id as Situacion)}>
                       <p className="font-semibold">{item.label}</p>
                       <p className="mt-1 text-xs font-normal opacity-90">{item.desc}</p>
@@ -1866,6 +1937,238 @@ export function OnboardingFlow({ userId, email }: Props) {
                 />
                 <p className="mt-1 text-right text-xs text-slate-500">{data.bio.length}/300</p>
               </div>
+
+              {isOwnerFlow ? (
+                <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4">
+                  <p className="text-sm font-semibold">Perfiles de companeros actuales</p>
+
+                  <button
+                    type="button"
+                    onClick={() => setField("viveConCompaneros", !data.viveConCompaneros)}
+                    className={`flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left transition ${
+                      data.viveConCompaneros
+                        ? "border-[#3B82F6] bg-[#EFF6FF]"
+                        : "border-slate-200 bg-white hover:border-[#93C5FD]"
+                    }`}
+                  >
+                    <span className="text-sm font-semibold text-slate-800">Ya vives con alguien en el piso</span>
+                    <span
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
+                        data.viveConCompaneros ? "bg-[#3B82F6]" : "bg-slate-300"
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-5 w-5 transform rounded-full bg-white transition ${
+                          data.viveConCompaneros ? "translate-x-5" : "translate-x-1"
+                        }`}
+                      />
+                    </span>
+                  </button>
+
+                  {data.viveConCompaneros ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (data.companeros.length >= 4) {
+                            return;
+                          }
+
+                          setField("companeros", [
+                            ...data.companeros,
+                            {
+                              id: crypto.randomUUID(),
+                              nombre: "",
+                              fotoDataUrl: "",
+                              edad: "",
+                              estudiaOTrabaja: "",
+                              horario: "",
+                              fumar: "",
+                              mascotas: "",
+                              ambiente: "",
+                              descripcion: "",
+                            },
+                          ]);
+                        }}
+                        className="min-h-11 rounded-xl border border-slate-200 px-4 text-sm font-semibold hover:border-[#FF6B6B] hover:text-[#FF6B6B]"
+                      >
+                        Anadir companero
+                      </button>
+
+                      <div className="space-y-3">
+                        {data.companeros.map((mate, index) => (
+                          <div key={mate.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                            <div className="mb-2 flex items-center justify-between">
+                              <p className="text-sm font-semibold text-slate-700">Companero {index + 1}</p>
+                              <button
+                                type="button"
+                                onClick={() => setField("companeros", data.companeros.filter((item) => item.id !== mate.id))}
+                                className="text-xs font-semibold text-rose-600"
+                              >
+                                Eliminar
+                              </button>
+                            </div>
+
+                            <div className="grid gap-2 sm:grid-cols-2">
+                              <div className="sm:col-span-2">
+                                <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.06em] text-slate-500">Foto del companero</label>
+                                <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-white p-3 hover:border-[#3B82F6]">
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={(e) => void handleCompanionPhoto(mate.id, e.target.files?.[0])}
+                                  />
+                                  {mate.fotoDataUrl ? (
+                                    <img src={mate.fotoDataUrl} alt={`foto-companero-${index + 1}`} className="h-16 w-16 rounded-xl object-cover" />
+                                  ) : (
+                                    <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-slate-100 text-xs font-semibold text-slate-500">
+                                      Sin foto
+                                    </div>
+                                  )}
+                                  <div className="text-left">
+                                    <p className="text-sm font-semibold text-slate-700">Subir foto</p>
+                                    <p className="text-xs text-slate-500">JPG, PNG o WEBP</p>
+                                  </div>
+                                </label>
+                              </div>
+
+                              <input
+                                className={fieldClass(false)}
+                                placeholder="Nombre"
+                                value={mate.nombre}
+                                onChange={(e) =>
+                                  setField(
+                                    "companeros",
+                                    data.companeros.map((item) => (item.id === mate.id ? { ...item, nombre: e.target.value } : item)),
+                                  )
+                                }
+                              />
+                              <input
+                                type="number"
+                                min={16}
+                                max={99}
+                                className={fieldClass(false)}
+                                placeholder="Edad"
+                                value={mate.edad}
+                                onChange={(e) =>
+                                  setField(
+                                    "companeros",
+                                    data.companeros.map((item) =>
+                                      item.id === mate.id ? { ...item, edad: e.target.value ? Number(e.target.value) : "" } : item,
+                                    ),
+                                  )
+                                }
+                              />
+                              <select
+                                className={fieldClass(false)}
+                                value={mate.estudiaOTrabaja}
+                                onChange={(e) =>
+                                  setField(
+                                    "companeros",
+                                    data.companeros.map((item) =>
+                                      item.id === mate.id ? { ...item, estudiaOTrabaja: e.target.value as CompanionForm["estudiaOTrabaja"] } : item,
+                                    ),
+                                  )
+                                }
+                              >
+                                <option value="">Estudia o trabaja</option>
+                                <option value="estudiante">Estudiante</option>
+                                <option value="trabajador">Trabajador</option>
+                                <option value="ambas">Ambas</option>
+                              </select>
+                              <select
+                                className={fieldClass(false)}
+                                value={mate.horario}
+                                onChange={(e) =>
+                                  setField(
+                                    "companeros",
+                                    data.companeros.map((item) =>
+                                      item.id === mate.id ? { ...item, horario: e.target.value as CompanionForm["horario"] } : item,
+                                    ),
+                                  )
+                                }
+                              >
+                                <option value="">Horario</option>
+                                <option value="diurno">Diurno</option>
+                                <option value="normal">Normal</option>
+                                <option value="nocturno">Nocturno</option>
+                              </select>
+                              <select
+                                className={fieldClass(false)}
+                                value={mate.fumar}
+                                onChange={(e) =>
+                                  setField(
+                                    "companeros",
+                                    data.companeros.map((item) =>
+                                      item.id === mate.id ? { ...item, fumar: e.target.value as CompanionForm["fumar"] } : item,
+                                    ),
+                                  )
+                                }
+                              >
+                                <option value="">Fuma</option>
+                                <option value="si">Si</option>
+                                <option value="no">No</option>
+                                <option value="solo_fuera">Solo fuera</option>
+                              </select>
+                              <select
+                                className={fieldClass(false)}
+                                value={mate.mascotas}
+                                onChange={(e) =>
+                                  setField(
+                                    "companeros",
+                                    data.companeros.map((item) =>
+                                      item.id === mate.id ? { ...item, mascotas: e.target.value as CompanionForm["mascotas"] } : item,
+                                    ),
+                                  )
+                                }
+                              >
+                                <option value="">Mascotas</option>
+                                <option value="tengo">Tiene</option>
+                                <option value="acepto">Acepta</option>
+                                <option value="no_acepto">No acepta</option>
+                              </select>
+                              <select
+                                className={fieldClass(false)}
+                                value={mate.ambiente}
+                                onChange={(e) =>
+                                  setField(
+                                    "companeros",
+                                    data.companeros.map((item) =>
+                                      item.id === mate.id ? { ...item, ambiente: e.target.value as CompanionForm["ambiente"] } : item,
+                                    ),
+                                  )
+                                }
+                              >
+                                <option value="">Ambiente</option>
+                                <option value="tranquilo">Tranquilo</option>
+                                <option value="equilibrado">Equilibrado</option>
+                                <option value="social">Social</option>
+                              </select>
+                              <textarea
+                                className="sm:col-span-2 min-h-20 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-[#FF6B6B]"
+                                maxLength={150}
+                                value={mate.descripcion}
+                                onChange={(e) =>
+                                  setField(
+                                    "companeros",
+                                    data.companeros.map((item) =>
+                                      item.id === mate.id ? { ...item, descripcion: e.target.value } : item,
+                                    ),
+                                  )
+                                }
+                                placeholder="Descripcion breve opcional"
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {errors.companeros ? <p className="text-xs font-medium text-rose-600">{errors.companeros}</p> : null}
+                    </>
+                  ) : null}
+                </div>
+              ) : null}
 
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
                 <p className="text-sm font-semibold">Verificacion de telefono (opcional)</p>

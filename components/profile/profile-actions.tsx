@@ -5,16 +5,18 @@ import { useRouter } from "next/navigation";
 
 type ProfileActionsProps = {
   profileId: string;
+  isAuthenticated: boolean;
   disabled: boolean;
   profileName: string;
   profilePhotoUrl: string | null;
   compatibility: number;
 };
 
-export function ProfileActions({ profileId, disabled, profileName, profilePhotoUrl, compatibility }: ProfileActionsProps) {
+export function ProfileActions({ profileId, isAuthenticated, disabled, profileName, profilePhotoUrl, compatibility }: ProfileActionsProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isComposerOpen, setIsComposerOpen] = useState(false);
+  const [isAuthRequiredOpen, setIsAuthRequiredOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [requestSent, setRequestSent] = useState(false);
   const [requestState, setRequestState] = useState<"idle" | "pending" | "accepted">("idle");
@@ -98,14 +100,60 @@ export function ProfileActions({ profileId, disabled, profileName, profilePhotoU
           </button>
           <button
             type="button"
-            disabled={disabled || isSubmitting || requestSent}
-            onClick={() => setIsComposerOpen(true)}
+            disabled={(isAuthenticated && disabled) || isSubmitting || requestSent}
+            onClick={() => {
+              if (!isAuthenticated) {
+                setIsAuthRequiredOpen(true);
+                return;
+              }
+              setIsComposerOpen(true);
+            }}
             className="min-h-14 flex-1 rounded-xl bg-[#FF6B6B] px-4 text-[16px] font-semibold text-white transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {requestSent ? (requestState === "accepted" ? "Contacto desbloqueado" : "Solicitud enviada") : "Solicitar contacto"}
           </button>
         </div>
       </div>
+
+      {isAuthRequiredOpen ? (
+        <div className="fixed inset-0 z-40 flex items-end justify-center bg-slate-950/35 p-4 sm:items-center">
+          <div className="w-full max-w-lg rounded-3xl border border-[#F0D8D3] bg-[#FFF8F5] p-5 shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#B35C52]">Necesitas cuenta</p>
+                <h2 className="mt-2 text-[22px] font-semibold text-[#1F2937]">Crea tu cuenta para contactar</h2>
+                <p className="mt-1 text-[14px] leading-6 text-[#6B7280]">
+                  Para contactar con esta persona necesitas crear una cuenta. Es gratis y solo tarda 2 minutos.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAuthRequiredOpen(false)}
+                className="rounded-full border border-[#E5E7EB] bg-white px-3 py-1.5 text-[13px] font-semibold text-[#4B5563]"
+              >
+                Cerrar
+              </button>
+            </div>
+
+            <div className="mt-5 grid grid-cols-2 gap-3 max-sm:grid-cols-1">
+              <button
+                type="button"
+                onClick={() => router.push("/register")}
+                className="min-h-12 rounded-2xl bg-[#FF6B6B] px-4 text-[15px] font-semibold text-white"
+              >
+                Crear cuenta
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push("/login")}
+                className="min-h-12 rounded-2xl border border-[#E5E7EB] bg-white px-4 text-[15px] font-semibold text-[#4B5563]"
+              >
+                Iniciar sesion
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {isComposerOpen ? (
         <div className="fixed inset-0 z-40 flex items-end justify-center bg-slate-950/35 p-4 sm:items-center">

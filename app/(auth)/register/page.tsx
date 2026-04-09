@@ -1,7 +1,20 @@
 import { AuthForm } from "@/components/auth/auth-form";
 import { AuthShell } from "@/components/auth/auth-shell";
 
-export default function RegisterPage() {
+type RegisterPageSearchParams = {
+  next?: string | string[];
+};
+
+type RegisterPageProps = {
+  searchParams?: RegisterPageSearchParams | Promise<RegisterPageSearchParams>;
+};
+
+export default async function RegisterPage({ searchParams }: RegisterPageProps) {
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const nextPath = Array.isArray(resolvedSearchParams?.next)
+    ? resolvedSearchParams?.next[0]
+    : resolvedSearchParams?.next;
+
   return (
     <AuthShell
       title="Crea tu perfil y empieza a encontrar convivencia con buena química."
@@ -10,7 +23,7 @@ export default function RegisterPage() {
       switchLabel="Entrar"
       switchHref="/login"
     >
-      <AuthForm mode="register" />
+      <AuthForm mode="register" nextPath={nextPath} />
     </AuthShell>
   );
 }

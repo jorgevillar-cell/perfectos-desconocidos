@@ -4,28 +4,22 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import Link from "next/link";
 
 import { PaymentMessageCard } from "@/components/chat/payment-message-card";
-import { PaymentRequestForm } from "@/components/chat/payment-request-form";
 import { logoutAction } from "@/lib/auth/actions";
 import { getPusherClient } from "@/lib/chat/pusher-client";
 import type { ChatMessage, ConversationSummary, MatchCelebrationPayload } from "@/lib/chat/types";
 import { ContactRequestsPanel } from "@/components/chat/request-inbox-panel";
-import { formatMoney } from "@/lib/stripe";
+import { ProfileWelcomePanel } from "@/components/chat/profile-welcome-panel";
+import { SavedProfilesPanel } from "@/components/chat/saved-profiles-panel";
+import { OnboardingEditPanel } from "@/components/onboarding/onboarding-edit-panel";
 import type { PaymentSummary } from "@/lib/payments/types";
+import { SAVED_PROFILES_STORAGE_KEY, SAVED_PROFILES_UPDATED_EVENT } from "@/lib/saved-profiles";
 
-type ActivePanel = "profile" | "chat" | "requests" | "notifications" | "settings" | null;
+type ActivePanel = "profile" | "chat" | "requests" | "saved" | "notifications" | "settings" | "onboarding-edit" | null;
 
 type ChatDockProps = {
+  isAuthenticated?: boolean;
   currentUserId: string;
   currentUserName: string;
-  currentUserHasPiso: boolean;
-  currentUserPrimaryPiso: {
-    id: string;
-    precio: number;
-    zona: string;
-    direccion: string | null;
-    descripcion: string;
-    fotos: string[];
-  } | null;
   openChatWithUserId?: string | null;
   initialCelebration?: MatchCelebrationPayload | null;
 };
@@ -158,14 +152,15 @@ function MobileDockButton({
 }
 
 export function ChatDock({
+  isAuthenticated = true,
   currentUserId,
   currentUserName,
-  currentUserHasPiso,
-  currentUserPrimaryPiso,
   openChatWithUserId,
   initialCelebration,
 }: ChatDockProps) {
   const [activePanel, setActivePanel] = useState<ActivePanel>(null);
+  // New: onboarding edit panel
+  const [showOnboardingEdit, setShowOnboardingEdit] = useState(false);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [unreadTotal, setUnreadTotal] = useState(0);
   const [activeMatchId, setActiveMatchId] = useState<string | null>(null);
@@ -173,6 +168,7 @@ export function ChatDock({
   const [loadingConversations, setLoadingConversations] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [requestBadgeCount, setRequestBadgeCount] = useState(0);
+  const [savedCount, setSavedCount] = useState(0);
   const [draft, setDraft] = useState("");
   const [typingByMatch, setTypingByMatch] = useState<Record<string, boolean>>({});
   const [toasts, setToasts] = useState<ToastItem[]>([]);
@@ -181,7 +177,7 @@ export function ChatDock({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [deleteAccountError, setDeleteAccountError] = useState("");
-  const [showPaymentRequestForm, setShowPaymentRequestForm] = useState(false);
+  const [isGuestMenuOpen, setIsGuestMenuOpen] = useState(false);
 
   const panelRef = useRef<HTMLDivElement | null>(null);
   const sidebarRef = useRef<HTMLDivElement | null>(null);
@@ -189,6 +185,7 @@ export function ChatDock({
   const typingDebounceRef = useRef<number | null>(null);
   const typingStopRef = useRef<number | null>(null);
   const readInFlightRef = useRef<Set<string>>(new Set());
+  const requestedFromExploreRef = useRef<Set<string>>(new Set());
   const isMobile = useIsMobile();
   const avatarLabel = initialsFromName(currentUserName || "U");
 
@@ -196,8 +193,6 @@ export function ChatDock({
     () => conversations.find((item) => item.matchId === activeMatchId) ?? null,
     [activeMatchId, conversations],
   );
-
-  const activePayment = activeConversation?.latestPayment ?? null;
 
   const activeMessages = useMemo(() => {
     if (!activeMatchId) return [];
@@ -220,13 +215,6 @@ export function ChatDock({
   }, [activeMessages]);
 
   const showMobileChatOnly = isMobile && !!activeConversation;
-  const canRequestPayment = Boolean(
-    currentUserHasPiso &&
-      activeConversation &&
-      activePanel === "chat" &&
-      (!activePayment || ["liberado", "reembolso_total", "fallido"].includes(activePayment.estado)),
-  );
-
   const pushToast = useCallback((message: string) => {
     const id = Date.now() + Math.floor(Math.random() * 1000);
     setToasts((prev) => [...prev, { id, message }]);
@@ -234,6 +222,102 @@ export function ChatDock({
       setToasts((prev) => prev.filter((item) => item.id !== id));
     }, 2800);
   }, []);
+
+  if (!isAuthenticated) {
+    return (
+      <>
+        <aside
+          onClick={() => {
+            if (!isGuestMenuOpen) {
+              setIsGuestMenuOpen(true);
+            }
+          }}
+          className={`fixed right-0 top-0 z-40 hidden h-screen border-l border-[#E5E7EB] bg-white transition-all duration-200 sm:block ${
+            isGuestMenuOpen ? "w-[250px]" : "w-16"
+          }`}
+          style={{ boxShadow: CARD_SHADOW }}
+        >
+          <div className="flex h-full flex-col items-center py-4">
+            <button
+              type="button"
+              onClick={() => setIsGuestMenuOpen((prev) => !prev)}
+              className="mt-1 flex h-11 w-11 items-center justify-center rounded-xl border border-[#E5E7EB] text-[#6B7280] transition hover:bg-[#F8F8F8]"
+              aria-label="Abrir menu"
+              title="Abrir menu"
+            >
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M4 7h16" />
+                <path d="M4 12h16" />
+                <path d="M4 17h16" />
+              </svg>
+            </button>
+
+            {isGuestMenuOpen ? (
+              <div className="mt-4 w-full px-3">
+                <p className="px-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#94A3B8]">Menu</p>
+                <div className="mt-2 space-y-2">
+                  <Link
+                    href="/login"
+                    className="flex min-h-12 w-full items-center gap-3 rounded-xl border border-[#E5E7EB] bg-white px-3 text-[14px] font-semibold text-[#4B5563] transition hover:bg-[#F8FAFC]"
+                  >
+                    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M10 17l5-5-5-5" />
+                      <path d="M15 12H3" />
+                      <path d="M21 3v18" />
+                    </svg>
+                    Iniciar sesion
+                  </Link>
+
+                  <Link
+                    href="/register"
+                    className="flex min-h-12 w-full items-center gap-3 rounded-xl border border-[#FFD3D3] bg-[#FFF1F1] px-3 text-[14px] font-semibold text-[#B35C52] transition hover:bg-[#FFE8E8]"
+                  >
+                    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <circle cx="12" cy="8" r="3" />
+                      <path d="M6 19c0-2.8 2.4-5 6-5s6 2.2 6 5" />
+                      <path d="M19 7v4" />
+                      <path d="M17 9h4" />
+                    </svg>
+                    Crear cuenta
+                  </Link>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </aside>
+
+        <nav className="fixed inset-x-0 bottom-3 z-40 flex justify-center px-3 sm:hidden">
+          <div
+            className="flex items-end gap-1.5 rounded-[26px] border border-[#E6EAF0] bg-white/92 px-2.5 py-2 backdrop-blur"
+            style={{ boxShadow: "0 14px 38px rgba(15,23,42,0.16)" }}
+          >
+            <Link href="/login" className="flex w-[68px] flex-col items-center gap-1.5">
+              <span className="relative inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-[#E6EAF0] bg-[linear-gradient(160deg,#F8FBFF_0%,#EEF4FF_100%)] text-[#667085]">
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M10 17l5-5-5-5" />
+                  <path d="M15 12H3" />
+                  <path d="M21 3v18" />
+                </svg>
+              </span>
+              <span className="text-[11px] font-semibold text-[#7A8494]">Entrar</span>
+            </Link>
+
+            <Link href="/register" className="flex w-[68px] flex-col items-center gap-1.5">
+              <span className="relative inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-[#FFD3D3] bg-[linear-gradient(160deg,#FFF1F1_0%,#FFE4E4_100%)] text-[#E45A5A]">
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="8" r="3" />
+                  <path d="M6 19c0-2.8 2.4-5 6-5s6 2.2 6 5" />
+                  <path d="M19 7v4" />
+                  <path d="M17 9h4" />
+                </svg>
+              </span>
+              <span className="text-[11px] font-semibold text-[#7A8494]">Registro</span>
+            </Link>
+          </div>
+        </nav>
+      </>
+    );
+  }
 
   const markAsRead = useCallback(
     async (matchId: string) => {
@@ -267,6 +351,10 @@ export function ChatDock({
   );
 
   const loadConversations = useCallback(async () => {
+    if (!isAuthenticated) {
+      return null;
+    }
+
     setLoadingConversations(true);
 
     try {
@@ -307,9 +395,13 @@ export function ChatDock({
     } finally {
       setLoadingConversations(false);
     }
-  }, [activeMatchId, openChatWithUserId, pushToast]);
+  }, [activeMatchId, isAuthenticated, openChatWithUserId, pushToast]);
 
   const loadRequestBadge = useCallback(async () => {
+    if (!isAuthenticated) {
+      return;
+    }
+
     try {
       const response = await fetch("/api/matches/solicitudes", {
         cache: "no-store",
@@ -324,10 +416,105 @@ export function ChatDock({
     } catch {
       return;
     }
-  }, []);
+  }, [isAuthenticated]);
+
+  const ensureConversationOrRequest = useCallback(
+    async (targetUserId: string) => {
+      if (!isAuthenticated || !targetUserId) {
+        return;
+      }
+
+      const existing = conversations.find((item) => item.otherUserId === targetUserId);
+      if (existing) {
+        setActivePanel("chat");
+        setActiveMatchId(existing.matchId);
+        return;
+      }
+
+      if (requestedFromExploreRef.current.has(targetUserId)) {
+        return;
+      }
+
+      requestedFromExploreRef.current.add(targetUserId);
+
+      try {
+        const response = await fetch("/api/matches/like", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            profileId: targetUserId,
+            message: "Hola! Me interesa tu perfil y me gustaria hablar contigo.",
+          }),
+        });
+
+        const payload = (await response.json()) as {
+          ok?: boolean;
+          matchConfirmado?: boolean;
+          error?: string;
+        };
+
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.error ?? "No se pudo enviar la solicitud de contacto");
+        }
+
+        if (payload.matchConfirmado) {
+          const refreshed = await loadConversations();
+          const targetConversation = refreshed?.find((item) => item.otherUserId === targetUserId) ?? null;
+
+          if (targetConversation) {
+            setActivePanel("chat");
+            setActiveMatchId(targetConversation.matchId);
+          }
+
+          pushToast("Contacto desbloqueado. Ya puedes escribir.");
+          return;
+        }
+
+        setActivePanel("requests");
+        void loadRequestBadge();
+        pushToast("Solicitud enviada. Te avisaremos cuando responda.");
+      } catch (error) {
+        pushToast(error instanceof Error ? error.message : "No se pudo enviar la solicitud de contacto");
+      }
+    },
+    [conversations, isAuthenticated, loadConversations, loadRequestBadge, pushToast],
+  );
 
   const handleRequestCountChange = useCallback((count: number) => {
     setRequestBadgeCount(count);
+  }, []);
+
+  useEffect(() => {
+    function readSavedCount() {
+      try {
+        const raw = localStorage.getItem(SAVED_PROFILES_STORAGE_KEY);
+        if (!raw) {
+          setSavedCount(0);
+          return;
+        }
+
+        const parsed = JSON.parse(raw) as unknown;
+        if (!Array.isArray(parsed)) {
+          setSavedCount(0);
+          return;
+        }
+
+        setSavedCount(parsed.length);
+      } catch {
+        setSavedCount(0);
+      }
+    }
+
+    readSavedCount();
+    window.addEventListener(SAVED_PROFILES_UPDATED_EVENT, readSavedCount);
+    window.addEventListener("storage", readSavedCount);
+
+    return () => {
+      window.removeEventListener(SAVED_PROFILES_UPDATED_EVENT, readSavedCount);
+      window.removeEventListener("storage", readSavedCount);
+    };
   }, []);
 
   const handleDeleteAccount = useCallback(async () => {
@@ -375,7 +562,6 @@ export function ChatDock({
       const conversation = nextConversations?.find((item) => item.otherUserId === otherUserId) ?? null;
       setActivePanel("chat");
       setActiveMatchId(conversation?.matchId ?? matchId ?? null);
-      setShowPaymentRequestForm(false);
     },
     [loadConversations],
   );
@@ -412,12 +598,35 @@ export function ChatDock({
   );
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      return;
+    }
+
     void loadConversations();
-  }, [loadConversations]);
+  }, [isAuthenticated, loadConversations]);
 
   useEffect(() => {
+    if (!isAuthenticated || !openChatWithUserId) {
+      return;
+    }
+
+    const existing = conversations.find((item) => item.otherUserId === openChatWithUserId);
+    if (existing) {
+      setActivePanel("chat");
+      setActiveMatchId(existing.matchId);
+      return;
+    }
+
+    void ensureConversationOrRequest(openChatWithUserId);
+  }, [conversations, ensureConversationOrRequest, isAuthenticated, openChatWithUserId]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      return;
+    }
+
     void loadRequestBadge();
-  }, [loadRequestBadge]);
+  }, [isAuthenticated, loadRequestBadge]);
 
   useEffect(() => {
     if (!activeMatchId || !activePanel || activePanel !== "chat") {
@@ -717,7 +926,7 @@ export function ChatDock({
   }
 
   function togglePanel(panel: Exclude<ActivePanel, null>) {
-    setActivePanel((prev) => (prev === panel ? null : panel));
+    setActivePanel(panel);
   }
 
   function closePanel() {
@@ -726,73 +935,73 @@ export function ChatDock({
 
   function onSelectConversation(matchId: string) {
     setActiveMatchId(matchId);
-    setShowPaymentRequestForm(false);
     if (isMobile) {
       setActivePanel("chat");
     }
     void markAsRead(matchId);
   }
 
-  function openPaymentRequestForm() {
-    setShowPaymentRequestForm(true);
-    setActivePanel("chat");
-  }
-
   return (
     <>
       <aside
         ref={sidebarRef}
-        className="fixed right-0 top-0 z-40 flex h-screen w-16 flex-col items-center justify-start gap-5 border-l border-[#E5E7EB] bg-white pt-6 max-sm:hidden"
-        style={{ boxShadow: "-6px 0 24px rgba(0,0,0,0.08)" }}
+        onClick={() => {
+          if (!activePanel) {
+            setActivePanel("profile");
+          }
+        }}
+        className="fixed right-0 top-0 z-40 flex h-screen w-16 flex-col items-center justify-start gap-6 border-l border-[#E5E7EB] bg-white pt-20 max-sm:hidden"
+        style={{ boxShadow: "-6px 0 24px rgba(0,0,0,0.08)", marginTop: 24 }}
       >
-        <div className="flex flex-1 flex-col items-center gap-5">
-          <button
-            type="button"
-            onClick={() => togglePanel("profile")}
-            className={`flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border text-[15px] font-bold transition ${
-              activePanel === "profile"
-                ? "border-[#FF6B6B] bg-[#FF6B6B]/10 text-[#FF6B6B]"
-                : "border-[#E5E7EB] bg-[#FFF5F5] text-[#FF6B6B] hover:border-[#FF6B6B]/35"
-            }`}
-            aria-label="Perfil"
-          >
-            {avatarLabel || "U"}
-          </button>
+        <div className="flex flex-1 flex-col items-center gap-6">
+          {/* Perfil */}
+          <div className="flex flex-col items-center">
+            <button
+              type="button"
+              onClick={() => togglePanel("profile")}
+              className={`flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border text-[15px] font-bold transition ${
+                activePanel === "profile"
+                  ? "border-[#FF6B6B] bg-[#FF6B6B]/10 text-[#FF6B6B]"
+                  : "border-[#E5E7EB] bg-[#FFF5F5] text-[#FF6B6B] hover:border-[#FF6B6B]/35"
+              }`}
+              aria-label="Perfil"
+            >
+              {avatarLabel || "U"}
+            </button>
+            <span className="text-[11px] text-[#7A8494] mt-1">Perfil</span>
+          </div>
 
-          <IconButton active={activePanel === "chat"} badge={unreadTotal} onClick={() => togglePanel("chat")}>
-            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M4 6h16v10H8l-4 3V6Z" />
-              <path d="M8 10h8" />
-            </svg>
-          </IconButton>
+          {/* Chat */}
+          <div className="flex flex-col items-center">
+            <IconButton active={activePanel === "chat"} badge={unreadTotal} onClick={() => togglePanel("chat")}>
+              <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M4 6h16v10H8l-4 3V6Z" />
+                <path d="M8 10h8" />
+              </svg>
+            </IconButton>
+            <span className="text-[11px] text-[#7A8494] mt-1">Chat</span>
+          </div>
 
-          <IconButton active={activePanel === "requests"} badge={requestBadgeCount} onClick={() => togglePanel("requests")}>
-            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M4 5h16v14H4z" />
-              <path d="M4 8l8 5 8-5" />
-            </svg>
-          </IconButton>
+          {/* Guardados */}
+          <div className="flex flex-col items-center">
+            <IconButton active={activePanel === "saved"} badge={savedCount} onClick={() => togglePanel("saved")}>
+              <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M6 4h12v16l-6-3-6 3V4Z" />
+              </svg>
+            </IconButton>
+            <span className="text-[11px] text-[#7A8494] mt-1">Guardados</span>
+          </div>
 
-          <IconButton active={activePanel === "notifications"} onClick={() => togglePanel("notifications")}>
-            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M15 17H5l2-2v-4a5 5 0 1 1 10 0v4l2 2h-4" />
-              <path d="M10 20a2 2 0 0 0 4 0" />
-            </svg>
-          </IconButton>
-
-          <IconButton active={activePanel === "settings"} onClick={() => togglePanel("settings")}>
-            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M12 3v3" />
-              <path d="M12 18v3" />
-              <path d="M4.93 4.93l2.12 2.12" />
-              <path d="M16.95 16.95l2.12 2.12" />
-              <path d="M3 12h3" />
-              <path d="M18 12h3" />
-              <path d="M4.93 19.07l2.12-2.12" />
-              <path d="M16.95 7.05l2.12-2.12" />
-              <circle cx="12" cy="12" r="4" />
-            </svg>
-          </IconButton>
+          {/* Editar perfil */}
+          <div className="flex flex-col items-center">
+            <IconButton active={activePanel === "onboarding-edit"} onClick={() => togglePanel("onboarding-edit")}>
+              <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M12 20h9" />
+                <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19.5 3 21l1.5-4L16.5 3.5Z" />
+              </svg>
+            </IconButton>
+            <span className="text-[11px] text-[#7A8494] mt-1">Editar perfil</span>
+          </div>
 
           <button
             type="button"
@@ -830,6 +1039,12 @@ export function ChatDock({
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M4 5h16v14H4z" />
               <path d="M4 8l8 5 8-5" />
+            </svg>
+          </MobileDockButton>
+
+          <MobileDockButton active={activePanel === "saved"} badge={savedCount} label="Guardados" onClick={() => togglePanel("saved")}>
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M6 4h12v16l-6-3-6 3V4Z" />
             </svg>
           </MobileDockButton>
 
@@ -885,6 +1100,8 @@ export function ChatDock({
                   ? "Mensajes"
                   : activePanel === "requests"
                   ? "Solicitudes"
+                  : activePanel === "saved"
+                  ? "Guardados"
                   : activePanel === "profile"
                   ? "Perfil"
                   : activePanel === "notifications"
@@ -895,7 +1112,7 @@ export function ChatDock({
               <div className="h-9 w-9" />
             </div>
             {activePanel === "chat" ? (
-              <div className="grid h-full grid-cols-[40%_60%] max-sm:grid-cols-1">
+              <div className="grid h-[calc(100%-56px)] grid-cols-[40%_60%] max-sm:grid-cols-1">
                 {!showMobileChatOnly ? (
                   <div className="h-full border-r border-[#E5E7EB] bg-white">
                     <div className="flex h-16 items-center justify-between border-b border-[#E5E7EB] px-4">
@@ -988,16 +1205,6 @@ export function ChatDock({
                         </div>
 
                         <div className="flex items-center gap-2">
-                          {canRequestPayment ? (
-                            <button
-                              type="button"
-                              onClick={openPaymentRequestForm}
-                              className="inline-flex h-9 items-center rounded-[999px] border border-[#FF6B6B]/25 px-3 text-[12px] font-semibold text-[#FF6B6B] transition hover:bg-[#FF6B6B]/10"
-                            >
-                              Solicitar pago del primer mes
-                            </button>
-                          ) : null}
-
                           <Link
                             href={`/profile/${activeConversation.otherUserId}`}
                             className="inline-flex h-9 items-center rounded-[999px] border border-[#FF6B6B]/25 px-3 text-[12px] font-semibold text-[#FF6B6B] transition hover:bg-[#FF6B6B]/10"
@@ -1007,54 +1214,7 @@ export function ChatDock({
                         </div>
                       </header>
 
-                      {activePayment ? (
-                        <div
-                          className={`border-b px-4 py-3 text-[13px] ${
-                            activePayment.estado === "incidencia_abierta"
-                              ? "border-[#FDE68A] bg-[#FFFBEB] text-[#92400E]"
-                              : activePayment.estado === "liberado"
-                                ? "border-[#BBF7D0] bg-[#F0FDF4] text-[#166534]"
-                                : "border-[#FFD3D3] bg-[#FFF8F8] text-[#B91C1C]"
-                          }`}
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="font-semibold">
-                              {activePayment.estado === "pendiente"
-                                ? "Solicitud de pago enviada"
-                                : activePayment.estado === "liberado"
-                                ? "Pago liberado al propietario"
-                                : activePayment.estado === "incidencia_abierta"
-                                  ? "Incidencia abierta"
-                                  : "Pago en custodia"}
-                            </p>
-                            <span className="font-bold text-[#FF6B6B]">{formatMoney(activePayment.cantidad)}</span>
-                          </div>
-                          <p className="mt-1 text-[12px] opacity-90">
-                            {activePayment.estado === "pendiente"
-                              ? "Aún falta que el inquilino complete el pago en la página segura."
-                              : activePayment.estado === "liberado"
-                              ? "El dinero ya fue transferido al propietario."
-                              : activePayment.estado === "incidencia_abierta"
-                                ? "Hay una incidencia abierta y el pago no se liberará automáticamente."
-                                : "Tu dinero queda protegido durante 48h y se libera automáticamente a los 7 días si no hay incidencias."}
-                          </p>
-                        </div>
-                      ) : null}
-
-                      {showPaymentRequestForm && currentUserPrimaryPiso && activeConversation && currentUserHasPiso ? (
-                        <div className="border-b border-[#E5E7EB] bg-[#FCFCFC] p-4">
-                          <PaymentRequestForm
-                            matchId={activeConversation.matchId}
-                            pisoId={currentUserPrimaryPiso.id}
-                            defaultAmount={currentUserPrimaryPiso.precio}
-                            pisoLabel={`${currentUserPrimaryPiso.direccion ?? currentUserPrimaryPiso.zona} · ${currentUserPrimaryPiso.descripcion}`}
-                            onCancel={() => setShowPaymentRequestForm(false)}
-                            onCreated={() => setShowPaymentRequestForm(false)}
-                          />
-                        </div>
-                      ) : null}
-
-                      <div ref={messagesWrapRef} className="h-[calc(100%-64px-86px)] overflow-y-auto px-4 py-4">
+                      <div ref={messagesWrapRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
                         {loadingMessages ? (
                           <p className="text-[14px] text-[#6B7280]">Cargando historial...</p>
                         ) : (
@@ -1155,15 +1315,30 @@ export function ChatDock({
                 onCountsChange={handleRequestCountChange}
                 onOpenChat={openChatFromRequest}
               />
+            ) : activePanel === "profile" ? (
+              <div className="h-[calc(100%-56px)]">
+                <ProfileWelcomePanel
+                  currentUserId={currentUserId}
+                  currentUserName={currentUserName}
+                  onRequestLogout={() => setShowLogoutConfirm(true)}
+                  onRequestDelete={() => { setDeleteAccountError(""); setShowDeleteConfirm(true); }}
+                />
+              </div>
+            ) : activePanel === "onboarding-edit" ? (
+              <div className="h-[calc(100%-56px)]">
+                <OnboardingEditPanel currentUserId={currentUserId} />
+              </div>
+            ) : activePanel === "saved" ? (
+              <SavedProfilesPanel active={activePanel === "saved"} />
             ) : (
-                <div className="flex h-full items-center justify-center px-8 py-8 text-center">
+                <div className="flex h-[calc(100%-56px)] items-center justify-center px-8 py-8 text-center">
                   <div className="w-full max-w-md space-y-4">
                     <p className="text-[20px] font-semibold text-[#1A1A1A]">
-                      {activePanel === "profile" ? "Perfil rapido" : activePanel === "notifications" ? "Notificaciones" : "Ajustes"}
+                      {activePanel === "notifications" ? "Notificaciones" : "Ajustes"}
                     </p>
                     <p className="text-[14px] text-[#6B7280]">
                       {activePanel === "settings"
-                        ? "Gestiona tus pagos y la seguridad de tu cuenta desde este panel."
+                        ? "Gestiona la seguridad de tu cuenta desde este panel."
                         : "Este panel queda preparado para conectarlo en la siguiente iteracion."}
                     </p>
 
@@ -1171,13 +1346,9 @@ export function ChatDock({
                       <div className="space-y-4 text-left">
                         <div className="rounded-3xl border border-[#E5E7EB] bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
                           <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-[#9CA3AF]">Pagos</p>
-                          <p className="mt-2 text-[14px] leading-6 text-[#6B7280]">Gestiona tu cuenta bancaria, la verificación y el estado de cobros.</p>
-                          <Link
-                            href="/settings/payments"
-                            className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl bg-[#FF6B6B] px-4 text-[14px] font-semibold text-white transition active:scale-[0.99]"
-                          >
-                            Ir a pagos
-                          </Link>
+                          <p className="mt-2 text-[14px] leading-6 text-[#6B7280]">
+                            Los pagos dentro de la plataforma estan temporalmente desactivados. El precio se muestra solo de forma informativa.
+                          </p>
                         </div>
 
                         <div className="rounded-3xl border border-[#E5E7EB] bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">

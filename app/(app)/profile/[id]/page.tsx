@@ -1,7 +1,10 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
+import type { ReactNode } from "react";
 
-import { ProfileActions } from "@/components/profile/profile-actions";
+import { ProfileLocationMap } from "@/components/profile/profile-location-map";
+import { RequestContactButton } from "@/components/profile/request-contact-button";
+import { SaveProfileButton } from "@/components/profile/save-profile-button";
 import { getDemoProfiles } from "@/lib/explore/demo-profiles";
 import { getCurrentUser } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -21,6 +24,7 @@ type RawProfile = {
 };
 
 type RawPiso = {
+  id?: string;
   precio: number | string;
   zona: string;
   direccion?: string | null;
@@ -28,10 +32,24 @@ type RawPiso = {
   disponibleDesde: string;
   gastosIncluidos: boolean;
   fotos: string[];
+  companeros_piso?: RawCompanion[] | null;
+};
+
+type RawCompanion = {
+  nombre: string;
+  fotoUrl: string | null;
+  edad: number | null;
+  estudiaOTrabaja: string | null;
+  horario: string | null;
+  fumar: string | null;
+  mascotas: string | null;
+  ambiente: string | null;
+  descripcion: string | null;
 };
 
 type RawUser = {
   id: string;
+  tipo_usuario?: string | null;
   nombre: string;
   edad: number;
   pais: string;
@@ -65,6 +83,7 @@ type ListingSummaryProps = {
 };
 
 type ListingDescriptionProps = {
+  title?: string;
   text: string;
 };
 
@@ -75,10 +94,14 @@ type ListingNormsProps = {
 type CompatibilitySectionProps = {
   score: number;
   rows: ComparisonItem[];
+  companionCompatibilityRows?: Array<{
+    name: string;
+    matches: string[];
+    mismatches: string[];
+  }>;
 };
 
 type SidebarContactCardProps = {
-  targetId: string;
   profileName: string;
   age: number;
   city: string;
@@ -91,6 +114,9 @@ type SidebarContactCardProps = {
   price: number;
   hasPiso: boolean;
   quickFacts: string[];
+  mapAddress: string | null;
+  actionSlot: ReactNode;
+  secondaryActionSlot: ReactNode;
 };
 
 function normalize(value: string | null | undefined) {
@@ -119,6 +145,12 @@ function toSituacionLabel(value: string) {
   if (value.includes("busco_habitacion")) return "Busca habitacion";
   if (value.includes("buscar_juntos")) return "Busca compañero";
   return value.replaceAll("_", " ");
+}
+
+function toRoleLabel(value: string) {
+  const normalized = value.replaceAll("_", " ").trim();
+  if (!normalized) return "Sin definir";
+  return `${normalized.charAt(0).toUpperCase()}${normalized.slice(1)}`;
 }
 
 function formatEuro(value: number) {
@@ -284,6 +316,48 @@ function comparisonRows(mine: RawProfile, target: RawProfile): ComparisonItem[] 
   ];
 }
 
+function companionsCompatibilityRows(mine: RawProfile | null, companions: RawCompanion[]) {
+  if (!companions.length) {
+    return [] as Array<{ name: string; matches: string[]; mismatches: string[] }>;
+  }
+
+  return companions.map((item, index) => {
+    const matches: string[] = [];
+    const mismatches: string[] = [];
+
+    if (!mine) {
+      mismatches.push("Inicia sesion para comparar");
+      return {
+        name: item.nombre?.trim() || `Companero ${index + 1}`,
+        matches,
+        mismatches,
+      };
+    }
+
+    const horarioMatch = normalize(mine.horario) === normalize(item.horario);
+    const ambienteMatch = normalize(mine.ambiente) === normalize(item.ambiente);
+    const fumarMatch = (mine.fumar ? "si" : "no") === normalize(item.fumar);
+
+    const mineMascotas = mine.mascotas ? "acepto" : "no_acepto";
+    const mateMascotas = normalize(item.mascotas);
+    const mascotasMatch =
+      mineMascotas === mateMascotas ||
+      (mineMascotas === "acepto" && mateMascotas === "tengo") ||
+      (mineMascotas === "no_acepto" && mateMascotas === "no_acepto");
+
+    (horarioMatch ? matches : mismatches).push("horario");
+    (fumarMatch ? matches : mismatches).push("fumar");
+    (mascotasMatch ? matches : mismatches).push("mascotas");
+    (ambienteMatch ? matches : mismatches).push("ambiente");
+
+    return {
+      name: item.nombre?.trim() || `Companero ${index + 1}`,
+      matches,
+      mismatches,
+    };
+  });
+}
+
 function Icon({ name, className = "h-4 w-4" }: { name: string; className?: string }) {
   if (name === "pin") {
     return (
@@ -383,6 +457,37 @@ function ListingHeaderGallery({ images, title }: ListingGalleryProps) {
   );
 }
 
+function ProfileHeroPhoto({
+  imageUrl,
+  name,
+  age,
+  city,
+  country,
+  role,
+}: {
+  imageUrl: string;
+  name: string;
+  age: number;
+  city: string;
+  country: string;
+  role: string;
+}) {
+  return (
+    <section className="rounded-3xl border border-[#E5EAF2] bg-white p-3 shadow-[0_8px_28px_rgba(15,23,42,0.06)] sm:p-4">
+      <div className="overflow-hidden rounded-2xl border border-[#E5E7EB] bg-[#24272B]">
+        <div className="relative">
+          <img src={imageUrl} alt={name} className="h-[200px] w-full object-cover object-[center_18%] sm:h-[250px]" loading="lazy" />
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/0 via-black/0 to-black/8" />
+        </div>
+        <div className="p-4">
+          <p className="text-[32px] font-bold leading-none text-white">{name}, {age}</p>
+          <p className="mt-1 text-[14px] text-white/85">{city} - {country} · {toRoleLabel(role)}</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function ListingSummary({ title, metaLine, chips }: ListingSummaryProps) {
   return (
     <section className="mt-5 rounded-3xl border border-[#E5EAF2] bg-white p-5 shadow-[0_8px_28px_rgba(15,23,42,0.05)] sm:p-6">
@@ -400,21 +505,21 @@ function ListingSummary({ title, metaLine, chips }: ListingSummaryProps) {
   );
 }
 
-function ListingTabs() {
+function ListingTabs({ showMap }: { showMap: boolean }) {
   return (
     <nav className="mt-5 flex flex-wrap gap-2 rounded-2xl border border-[#E5EAF2] bg-white p-2">
       <a href="#descripcion" className="rounded-xl bg-[#0F172A] px-4 py-2 text-[13px] font-semibold text-white">Descripcion</a>
       <a href="#normas" className="rounded-xl px-4 py-2 text-[13px] font-semibold text-[#475467] transition hover:bg-[#F3F5F8]">Normas</a>
       <a href="#compatibilidad" className="rounded-xl px-4 py-2 text-[13px] font-semibold text-[#475467] transition hover:bg-[#F3F5F8]">Compatibilidad</a>
-      <a href="#mapa" className="rounded-xl px-4 py-2 text-[13px] font-semibold text-[#475467] transition hover:bg-[#F3F5F8]">Mapa</a>
+      {showMap ? <a href="#mapa" className="rounded-xl px-4 py-2 text-[13px] font-semibold text-[#475467] transition hover:bg-[#F3F5F8]">Mapa</a> : null}
     </nav>
   );
 }
 
-function ListingDescription({ text }: ListingDescriptionProps) {
+function ListingDescription({ title = "Sobre el piso y la convivencia", text }: ListingDescriptionProps) {
   return (
     <section id="descripcion" className="mt-4 rounded-3xl border border-[#E5EAF2] bg-white p-5 shadow-[0_6px_24px_rgba(15,23,42,0.04)] sm:p-6">
-      <h2 className="text-[22px] font-semibold text-[#0F172A]">Sobre el piso y la convivencia</h2>
+      <h2 className="text-[22px] font-semibold text-[#0F172A]">{title}</h2>
       <p className="mt-3 text-[16px] leading-8 text-[#344054]">{text}</p>
     </section>
   );
@@ -436,7 +541,120 @@ function ListingNorms({ items }: ListingNormsProps) {
   );
 }
 
-function CompatibilitySection({ score, rows }: CompatibilitySectionProps) {
+function formatAvailability(value: string | null | undefined) {
+  if (!value) return "Por acordar";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Por acordar";
+  return new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "long" }).format(date);
+}
+
+function HousingOrSearchSection({
+  hasPiso,
+  price,
+  zone,
+  city,
+  availableFrom,
+  companionsCount,
+  description,
+  zones,
+}: {
+  hasPiso: boolean;
+  price: number;
+  zone: string;
+  city: string;
+  availableFrom: string | null | undefined;
+  companionsCount: number;
+  description: string;
+  zones: string[];
+}) {
+  if (hasPiso) {
+    return (
+      <section className="mt-4 rounded-3xl border border-[#E5EAF2] bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.06)] sm:p-6">
+        <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-[#667085]">El piso</p>
+        <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
+          <div className="rounded-xl border border-[#E8EDF5] bg-[#F8FAFD] px-3 py-2.5 text-[14px] text-[#344054]"><span className="font-semibold">Precio habitacion:</span> {formatEuro(price)}/mes</div>
+          <div className="rounded-xl border border-[#E8EDF5] bg-[#F8FAFD] px-3 py-2.5 text-[14px] text-[#344054]"><span className="font-semibold">Zona:</span> {zone}, {city}</div>
+          <div className="rounded-xl border border-[#E8EDF5] bg-[#F8FAFD] px-3 py-2.5 text-[14px] text-[#344054]"><span className="font-semibold">Disponible desde:</span> {formatAvailability(availableFrom)}</div>
+          <div className="rounded-xl border border-[#E8EDF5] bg-[#F8FAFD] px-3 py-2.5 text-[14px] text-[#344054]"><span className="font-semibold">Companeros actuales:</span> {companionsCount > 0 ? companionsCount : "Vive solo"}</div>
+        </div>
+        <p className="mt-3 text-[15px] leading-7 text-[#344054]">{description}</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="mt-4 rounded-3xl border border-[#E5EAF2] bg-[linear-gradient(180deg,#FFFFFF_0%,#F9FBFF_100%)] p-5 shadow-[0_10px_28px_rgba(15,23,42,0.06)] sm:p-6">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-[#667085]">Lo que busca</p>
+        <span className="rounded-full border border-[#DCE6F4] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#3B4A66]">Datos onboarding</span>
+      </div>
+      <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
+        <div className="rounded-xl border border-[#E8EDF5] bg-white px-3 py-2.5 text-[14px] text-[#344054]"><span className="font-semibold">Presupuesto maximo:</span> {formatEuro(price)}/mes</div>
+        <div className="rounded-xl border border-[#E8EDF5] bg-white px-3 py-2.5 text-[14px] text-[#344054]"><span className="font-semibold">Ciudad objetivo:</span> {city}</div>
+        <div className="rounded-xl border border-[#E8EDF5] bg-white px-3 py-2.5 text-[14px] text-[#344054] sm:col-span-2"><span className="font-semibold">Tipo:</span> Habitacion o compartir piso</div>
+      </div>
+      {zones.length ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {zones.map((item) => (
+            <span key={item} className="rounded-full border border-[#DDE6F2] bg-white px-3 py-1.5 text-[13px] font-medium text-[#334155]">{item}</span>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function LivingStyleGrid({ profile }: { profile: RawProfile }) {
+  return (
+    <section className="mt-4 rounded-3xl border border-[#E5EAF2] bg-white p-5 shadow-[0_6px_24px_rgba(15,23,42,0.04)] sm:p-6">
+      <h2 className="text-[22px] font-semibold text-[#0F172A]">Forma de vivir</h2>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="rounded-xl bg-[#F8FAFD] p-3 text-[14px]"><p className="text-[#667085]">Fuma</p><p className="font-semibold">{profile.fumar ? "Si" : "No"}</p></div>
+        <div className="rounded-xl bg-[#F8FAFD] p-3 text-[14px]"><p className="text-[#667085]">Horario</p><p className="font-semibold">{profile.horario}</p></div>
+        <div className="rounded-xl bg-[#F8FAFD] p-3 text-[14px]"><p className="text-[#667085]">Ambiente</p><p className="font-semibold">{profile.ambiente}</p></div>
+        <div className="rounded-xl bg-[#F8FAFD] p-3 text-[14px]"><p className="text-[#667085]">Mascotas</p><p className="font-semibold">{profile.mascotas ? "Acepta" : "No acepta"}</p></div>
+        <div className="rounded-xl bg-[#F8FAFD] p-3 text-[14px]"><p className="text-[#667085]">Deporte</p><p className="font-semibold">{profile.deporte}</p></div>
+        <div className="rounded-xl bg-[#F8FAFD] p-3 text-[14px]"><p className="text-[#667085]">Universidad</p><p className="font-semibold">{profile.universidad ?? "Sin dato"}</p></div>
+      </div>
+    </section>
+  );
+}
+
+function LivingWithSection({ companions }: { companions: RawCompanion[] }) {
+  if (!companions.length) {
+    return null;
+  }
+
+  return (
+    <section className="mt-4 rounded-3xl border border-[#E5EAF2] bg-white p-5 shadow-[0_6px_24px_rgba(15,23,42,0.04)] sm:p-6">
+      <h2 className="text-[22px] font-semibold text-[#0F172A]">Con quien viviras</h2>
+      <div className="mt-4 space-y-3">
+        {companions.map((item, index) => (
+          <article key={`${item.nombre}-${index}`} className="rounded-2xl border border-[#E6EAF0] bg-[#FAFBFD] p-4">
+            <div className="flex items-center gap-3">
+              <img
+                src={withFallback(item.fotoUrl)}
+                alt={item.nombre || `Companero ${index + 1}`}
+                className="h-12 w-12 rounded-xl object-cover"
+                loading="lazy"
+              />
+              <p className="text-[16px] font-semibold text-[#101828]">{item.nombre}{item.edad ? `, ${item.edad}` : ""}</p>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2 text-[12px]">
+              {item.horario ? <span className="rounded-full border border-[#DDE6F2] bg-white px-2.5 py-1">Horario: {item.horario}</span> : null}
+              {item.fumar ? <span className="rounded-full border border-[#DDE6F2] bg-white px-2.5 py-1">Fumar: {item.fumar}</span> : null}
+              {item.mascotas ? <span className="rounded-full border border-[#DDE6F2] bg-white px-2.5 py-1">Mascotas: {item.mascotas}</span> : null}
+              {item.ambiente ? <span className="rounded-full border border-[#DDE6F2] bg-white px-2.5 py-1">Ambiente: {item.ambiente}</span> : null}
+            </div>
+            {item.descripcion?.trim() ? <p className="mt-2 text-[14px] text-[#475467]">{item.descripcion}</p> : null}
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function CompatibilitySection({ score, rows, companionCompatibilityRows = [] }: CompatibilitySectionProps) {
   const matchedRows = rows.filter((row) => row.state !== "gray");
   const reviewRows = rows.filter((row) => row.state === "gray");
 
@@ -457,14 +675,18 @@ function CompatibilitySection({ score, rows }: CompatibilitySectionProps) {
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
-        <div className="rounded-2xl border border-[#E3F2EC] bg-[#F8FDFB] p-4">
-          <p className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[#1A7F5A]">Coincidencias clave</p>
+        <div className="rounded-2xl border border-[#D7EEDF] bg-[linear-gradient(180deg,#F7FDF9_0%,#EEFBF3_100%)] p-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[#1A7F5A]">Coincidencias clave</p>
+            <span className="rounded-full bg-[#DBF5E8] px-2.5 py-1 text-[11px] font-semibold text-[#1A7F5A]">Match</span>
+          </div>
           <div className="mt-3 space-y-2.5">
             {matchedRows.length ? (
               matchedRows.map((row) => (
-                <div key={row.label} className="rounded-xl border border-[#D7EFE5] bg-white p-3 text-[14px] text-[#1D2939]">
-                  <p className="font-semibold">{row.label}</p>
+                <div key={row.label} className="rounded-xl border border-[#CCE8DA] bg-white p-3 text-[14px] text-[#1D2939] shadow-[0_2px_10px_rgba(16,24,40,0.04)]">
+                  <p className="font-semibold text-[#0E3B2F]">{row.label}</p>
                   <p className="mt-1 text-[13px] text-[#475467]">{row.target}</p>
+                  <p className="text-[12px] text-[#1A7F5A]">{row.mine}</p>
                 </div>
               ))
             ) : (
@@ -489,23 +711,31 @@ function CompatibilitySection({ score, rows }: CompatibilitySectionProps) {
           </div>
         </div>
       </div>
+
+      {companionCompatibilityRows.length ? (
+        <div className="mt-6 rounded-2xl border border-[#E6EAF0] bg-[#FAFBFD] p-4">
+          <p className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[#475467]">Compatibilidad con los companeros</p>
+          <div className="mt-3 space-y-3">
+            {companionCompatibilityRows.map((companion) => (
+              <div key={companion.name} className="rounded-xl border border-[#E4E7EC] bg-white p-3">
+                <p className="text-[14px] font-semibold text-[#1D2939]">{companion.name}</p>
+                <p className="mt-1 text-[12px] font-semibold uppercase tracking-[0.06em] text-[#1A7F5A]">Coincide en: {companion.matches.join(", ") || "-"}</p>
+                <p className="mt-1 text-[12px] font-semibold uppercase tracking-[0.06em] text-[#B54708]">A revisar: {companion.mismatches.join(", ") || "-"}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
 
-function MapSection({ area }: { area: string }) {
+function MapSection({ area, address, city, zone }: { area: string; address: string; city: string; zone: string }) {
   return (
     <section id="mapa" className="mt-4 rounded-3xl border border-[#E5EAF2] bg-white p-5 shadow-[0_6px_24px_rgba(15,23,42,0.04)] sm:p-6">
       <h2 className="text-[22px] font-semibold text-[#0F172A]">Ubicacion</h2>
-      <p className="mt-2 text-[14px] text-[#667085]">Zona aproximada en {area}. La direccion exacta se comparte tras iniciar conversacion.</p>
-      <div className="mt-4 h-[220px] overflow-hidden rounded-2xl border border-[#DFE5EE] bg-[radial-gradient(circle_at_20%_20%,#EEF4FF_0%,#F8FAFC_45%,#E8EEF9_100%)]">
-        <div className="flex h-full items-center justify-center text-[#52637A]">
-          <span className="inline-flex items-center gap-2 rounded-full border border-[#CBD5E1] bg-white/90 px-4 py-2 text-[14px] font-semibold">
-            <Icon name="pin" className="h-4 w-4" />
-            {area}
-          </span>
-        </div>
-      </div>
+      <p className="mt-2 text-[14px] text-[#667085]">Ubicacion del piso en {area}.</p>
+      <ProfileLocationMap address={address} city={city} zone={zone} />
     </section>
   );
 }
@@ -575,8 +805,29 @@ function MiniMapCard({ area }: { area: string }) {
   );
 }
 
+function ExactPisoMapCard({
+  address,
+  city,
+  zone,
+  photoUrl,
+}: {
+  address: string;
+  city: string;
+  zone: string;
+  photoUrl: string;
+}) {
+  return (
+    <div className="mt-4 overflow-hidden rounded-2xl border border-[#E6EAF0] bg-white">
+      <div className="px-4 pt-3 text-[13px] text-[#475467]">
+        <p className="inline-flex items-center gap-2 font-medium"><Icon name="pin" className="h-4 w-4" />Ubicacion exacta del piso</p>
+        <p className="mt-1 text-[#667085]">{address}</p>
+      </div>
+      <ProfileLocationMap address={address} city={city} zone={zone} markerImageUrl={photoUrl} compact className="mt-3" />
+    </div>
+  );
+}
+
 function SidebarContactCard({
-  targetId,
   profileName,
   age,
   city,
@@ -589,6 +840,9 @@ function SidebarContactCard({
   price,
   hasPiso,
   quickFacts,
+  mapAddress,
+  actionSlot,
+  secondaryActionSlot,
 }: SidebarContactCardProps) {
   return (
     <aside className="rounded-3xl border border-[#E5EAF2] bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.08)] lg:sticky lg:top-5">
@@ -604,20 +858,8 @@ function SidebarContactCard({
       </div>
 
       <div className="mt-5 grid gap-2.5">
-        <Link
-          href={`/explore?chatWith=${targetId}`}
-          className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[#F76565] px-4 text-[15px] font-semibold text-white transition hover:bg-[#ef5858]"
-        >
-          <Icon name="message" className="h-4 w-4" />
-          Enviar mensaje
-        </Link>
-        <a
-          href="#compatibilidad"
-          className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-[#D0D5DD] bg-[#F9FAFB] px-4 text-[15px] font-semibold text-[#1D2939] transition hover:bg-[#F3F4F6]"
-        >
-          <Icon name="bookmark" className="h-4 w-4" />
-          Me interesa
-        </a>
+        {actionSlot}
+        {secondaryActionSlot}
       </div>
 
       <div className="mt-4 border-t border-[#E9EEF4] pt-4">
@@ -631,7 +873,11 @@ function SidebarContactCard({
           photoUrl={photoUrl}
           verified={verified}
         />
-        <MiniMapCard area={`${zone}, ${city}`} />
+        {hasPiso && mapAddress ? (
+          <ExactPisoMapCard address={mapAddress} city={city} zone={zone} photoUrl={photoUrl} />
+        ) : (
+          <MiniMapCard area={`${zone}, ${city}`} />
+        )}
         <QuickFacts items={quickFacts} />
       </div>
 
@@ -644,30 +890,33 @@ function SidebarContactCard({
 
 export default async function ProfilePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const authUser = await getCurrentUser();
 
-  if (!authUser) {
-    redirect("/login");
-  }
-
   const { id } = await params;
+  const query = await searchParams;
+  const autoOpenRequestComposer =
+    (Array.isArray(query.solicitar) ? query.solicitar[0] : query.solicitar) === "1";
   const supabase = await createSupabaseServerClient();
 
   const [{ data: meData }, { data: targetData }] = await Promise.all([
+    authUser
+      ? supabase
+          .from("users")
+          .select(
+            "id,nombre,perfil_convivencia(situacion,estudiaOTrabaja,universidad,presupuesto,zonas,fumar,mascotas,horario,ambiente,deporte,aficiones)",
+          )
+          .eq("id", authUser.id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
     supabase
       .from("users")
       .select(
-        "id,nombre,perfil_convivencia(situacion,estudiaOTrabaja,universidad,presupuesto,zonas,fumar,mascotas,horario,ambiente,deporte,aficiones)",
-      )
-      .eq("id", authUser.id)
-      .maybeSingle(),
-    supabase
-      .from("users")
-      .select(
-        "id,nombre,edad,pais,ciudad,idiomas,fotoUrl,bio,verificado,perfil_convivencia(situacion,estudiaOTrabaja,universidad,presupuesto,zonas,fumar,mascotas,horario,ambiente,deporte,aficiones),pisos(precio,zona,direccion,descripcion,disponibleDesde,gastosIncluidos,fotos)",
+        "id,tipo_usuario,nombre,edad,pais,ciudad,idiomas,fotoUrl,bio,verificado,perfil_convivencia(situacion,estudiaOTrabaja,universidad,presupuesto,zonas,fumar,mascotas,horario,ambiente,deporte,aficiones),pisos(id,precio,zona,direccion,descripcion,disponibleDesde,gastosIncluidos,fotos,companeros_piso(nombre,fotoUrl,edad,estudiaOTrabaja,horario,fumar,mascotas,ambiente,descripcion))",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -682,6 +931,7 @@ export default async function ProfilePage({
     if (demo) {
       target = {
         id: demo.id,
+        tipo_usuario: demo.situacion.includes("tengo_piso") ? "propietario" : "buscador",
         nombre: demo.nombre,
         edad: demo.edad,
         pais: demo.pais,
@@ -708,6 +958,38 @@ export default async function ProfilePage({
     }
   }
 
+  if (!target && id.startsWith("demo-")) {
+    const fallbackDemo = getDemoProfiles()[0] ?? null;
+    if (fallbackDemo) {
+      target = {
+        id: fallbackDemo.id,
+        tipo_usuario: fallbackDemo.situacion.includes("tengo_piso") ? "propietario" : "buscador",
+        nombre: fallbackDemo.nombre,
+        edad: fallbackDemo.edad,
+        pais: fallbackDemo.pais,
+        ciudad: fallbackDemo.ciudad,
+        idiomas: fallbackDemo.idiomas,
+        fotoUrl: fallbackDemo.fotoUrl,
+        bio: fallbackDemo.bio,
+        verificado: fallbackDemo.verificado,
+        perfil_convivencia: {
+          situacion: fallbackDemo.situacion,
+          estudiaOTrabaja: fallbackDemo.estudiaOTrabaja,
+          universidad: fallbackDemo.universidad,
+          presupuesto: fallbackDemo.presupuesto,
+          zonas: [fallbackDemo.zona],
+          fumar: fallbackDemo.fumar,
+          mascotas: fallbackDemo.mascotas,
+          horario: fallbackDemo.horario,
+          ambiente: fallbackDemo.ambiente,
+          deporte: fallbackDemo.deporte,
+          aficiones: fallbackDemo.aficiones,
+        },
+        pisos: fallbackDemo.pisos,
+      };
+    }
+  }
+
   if (!target) {
     notFound();
   }
@@ -722,25 +1004,23 @@ export default async function ProfilePage({
   const score = myProfile ? compatibilityScore(myProfile, targetProfile) : 56;
   const rows = myProfile ? comparisonRows(myProfile, targetProfile) : [];
   const traits = chipFromProfile(targetProfile);
-  const isStudent = normalize(targetProfile.estudiaOTrabaja).includes("estudiante");
-  const hasPiso = normalize(targetProfile.situacion).includes("tengo_piso") || (target.pisos?.length ?? 0) > 0;
+  const companionRows = companionsCompatibilityRows(myProfile, target.pisos?.[0]?.companeros_piso ?? []);
+  const isOwner = target.tipo_usuario === "propietario" || normalize(targetProfile.situacion).includes("tengo_piso");
+  const hasPiso = (target.pisos?.length ?? 0) > 0;
   const primaryPiso = target.pisos?.[0] ?? null;
+  const companions = primaryPiso?.companeros_piso ?? [];
+  const hasCompanions = companions.length > 0;
   const galleryImages =
     (target.pisos ?? []).flatMap((piso) => piso.fotos ?? []).filter((item) => item?.trim()) || [];
+  const hasGallery = galleryImages.length > 0;
   const announcementPrice = hasPiso
     ? parseNumber(primaryPiso?.precio)
     : parseNumber(targetProfile.presupuesto);
   const listingTitle = hasPiso
     ? `Habitacion disponible en piso compartido en ${primaryPiso?.zona || target.ciudad}, ${target.ciudad}`
-    : `Busco habitacion en ${target.ciudad} con convivencia compatible`;
-  const metaLine = `${primaryPiso?.zona || targetProfile.zonas?.[0] || target.ciudad}, ${target.ciudad} · ${toSituacionLabel(targetProfile.situacion)} · ${targetProfile.estudiaOTrabaja}`;
-  const summaryChips = [
-    hasPiso ? "Habitacion disponible" : "Buscando habitacion",
-    primaryPiso?.gastosIncluidos ? "Gastos incluidos" : "Gastos aparte",
-    targetProfile.fumar ? "Fumador" : "No fumador",
-    "Amueblado",
-    "Disponible ahora",
-  ];
+    : isOwner
+      ? `Perfil de propietario en ${target.ciudad}`
+      : `Busco habitacion en ${target.ciudad} con convivencia compatible`;
   const descriptionText = primaryPiso?.descripcion?.trim()
     ? cleanPisoDescription(primaryPiso.descripcion)
     : target.bio?.trim() || "Convivencia tranquila y piso bien conectado. Busco una persona responsable, con horarios claros y comunicacion sencilla para el dia a dia.";
@@ -753,38 +1033,61 @@ export default async function ProfilePage({
     "Ambiente de convivencia basado en comunicacion y respeto.",
   ];
   const quickFacts = [
-    hasPiso ? "3 habitaciones" : "Vivienda compartida",
-    pisoCompaneros ? `${pisoCompaneros} personas en casa` : "Convivencia por confirmar",
-    "1 bano",
+    hasPiso ? "Piso compartido" : "Buscando piso",
+    pisoCompaneros ? `${pisoCompaneros} companeros en casa` : hasPiso ? "Vive solo actualmente" : "Convivencia por definir",
+    targetProfile.universidad ? targetProfile.universidad : "Universidad sin definir",
     primaryPiso?.gastosIncluidos ? "Gastos incluidos" : "Gastos no incluidos",
-    "Ascensor",
-    "Salon compartido",
+    `${primaryPiso?.zona || targetProfile.zonas?.[0] || target.ciudad}, ${target.ciudad}`,
+    hasPiso ? `Disponible ${formatAvailability(primaryPiso?.disponibleDesde)}` : "Disponible por acordar",
   ];
   const dominantLanguage = (target.idiomas ?? [])[0] || "Espanol";
 
   return (
     <main className="min-h-screen bg-[#F3F5F8] pb-28 text-[#0F172A]">
-      <div className="mx-auto w-full max-w-[1240px] px-4 py-4 sm:px-6 lg:px-8 lg:py-6">
-        <div className="mb-4 flex items-center justify-between">
-          <Link
-            href="/explore"
-            className="inline-flex h-10 items-center gap-2 rounded-full border border-[#D7DFEA] bg-white px-4 text-[14px] font-semibold text-[#1F2937] shadow-sm"
-          >
-            Volver a explorar
-          </Link>
-          <span className="hidden rounded-full border border-[#D7DFEA] bg-white px-3 py-1 text-[12px] font-semibold text-[#475467] sm:inline-flex">
-            Detalle de anuncio
-          </span>
-        </div>
+      <Link
+        href="/explore"
+        aria-label="Volver"
+        className="fixed left-1 top-12 z-30 inline-flex h-12 w-12 items-center justify-center text-[#334155] transition hover:text-[#0F172A] sm:left-2"
+      >
+        <svg viewBox="0 0 24 24" className="h-9 w-9" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="m15 18-6-6 6-6" />
+        </svg>
+      </Link>
 
+      <div className="mx-auto w-full max-w-[1240px] px-4 pb-4 pt-8 sm:px-6 sm:pt-10 lg:px-8 lg:pb-6 lg:pt-12">
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1.95fr)_minmax(300px,0.95fr)] lg:items-start">
           <section>
-            <ListingHeaderGallery images={galleryImages} title={listingTitle} />
-            <ListingSummary title={listingTitle} metaLine={metaLine} chips={summaryChips} />
-            <ListingTabs />
-            <ListingDescription text={descriptionText} />
-            <ListingNorms items={norms} />
-            <CompatibilitySection score={score} rows={rows} />
+            <ProfileHeroPhoto
+              imageUrl={withFallback(target.fotoUrl)}
+              name={target.nombre}
+              age={target.edad}
+              city={target.ciudad}
+              country={target.pais}
+              role={targetProfile.estudiaOTrabaja}
+            />
+            {isOwner ? (
+              hasGallery ? (
+                <ListingHeaderGallery images={galleryImages} title={listingTitle} />
+              ) : (
+                <section className="rounded-3xl border border-[#E5EAF2] bg-[#EEF2F7] p-8 text-center shadow-[0_8px_28px_rgba(15,23,42,0.06)]">
+                  <p className="text-[15px] font-semibold text-[#475467]">Este propietario no ha anadido fotos del piso todavia</p>
+                </section>
+              )
+            ) : null}
+            <HousingOrSearchSection
+              hasPiso={hasPiso}
+              price={announcementPrice}
+              zone={primaryPiso?.zona || targetProfile.zonas?.[0] || target.ciudad}
+              city={target.ciudad}
+              availableFrom={primaryPiso?.disponibleDesde}
+              companionsCount={companions.length || (pisoCompaneros ?? 0)}
+              description={descriptionText}
+              zones={targetProfile.zonas ?? []}
+            />
+            <ListingDescription title="Sobre mi" text={target.bio?.trim() || descriptionText} />
+            <LivingStyleGrid profile={targetProfile} />
+            {isOwner && hasCompanions ? <LivingWithSection companions={companions} /> : null}
+            <CompatibilitySection score={score} rows={rows} companionCompatibilityRows={isOwner && hasCompanions ? companionRows : []} />
 
             <section className="mt-4 rounded-3xl border border-[#E5EAF2] bg-white p-5 shadow-[0_6px_24px_rgba(15,23,42,0.04)] sm:p-6">
               <h2 className="text-[22px] font-semibold text-[#0F172A]">Perfil de convivencia</h2>
@@ -809,12 +1112,18 @@ export default async function ProfilePage({
               ) : null}
             </section>
 
-            <MapSection area={`${primaryPiso?.zona || target.ciudad}, ${target.ciudad}`} />
+            {hasPiso ? (
+              <MapSection
+                area={`${primaryPiso?.zona || target.ciudad}, ${target.ciudad}`}
+                address={primaryPiso?.direccion || `${primaryPiso?.zona || target.ciudad}, ${target.ciudad}`}
+                city={target.ciudad}
+                zone={primaryPiso?.zona || target.ciudad}
+              />
+            ) : null}
           </section>
 
           <section>
             <SidebarContactCard
-              targetId={target.id}
               profileName={target.nombre}
               age={target.edad}
               city={target.ciudad}
@@ -827,18 +1136,40 @@ export default async function ProfilePage({
               price={announcementPrice}
               hasPiso={hasPiso}
               quickFacts={quickFacts}
+              mapAddress={primaryPiso?.direccion ?? null}
+              actionSlot={
+                <RequestContactButton
+                  profileId={target.id}
+                  profileName={target.nombre}
+                  profilePhotoUrl={target.fotoUrl}
+                  compatibility={score}
+                  isAuthenticated={authUser !== null}
+                  disabled={authUser ? target.id === authUser.id : false}
+                  autoOpen={autoOpenRequestComposer}
+                  buttonLabel="Solicitar contacto"
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[#F76565] px-4 text-[15px] font-semibold text-white transition hover:bg-[#ef5858]"
+                />
+              }
+              secondaryActionSlot={
+                <SaveProfileButton
+                  item={{
+                    id: target.id,
+                    name: target.nombre,
+                    age: target.edad,
+                    city: target.ciudad,
+                    zone: primaryPiso?.zona || targetProfile.zonas?.[0] || target.ciudad,
+                    photoUrl: withFallback(target.fotoUrl),
+                    hasPiso,
+                    price: announcementPrice,
+                  }}
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-[#D0D5DD] bg-[#F9FAFB] px-4 text-[15px] font-semibold text-[#1D2939] transition hover:bg-[#F3F4F6]"
+                />
+              }
             />
           </section>
         </div>
       </div>
 
-      <ProfileActions
-        profileId={target.id}
-        disabled={target.id === authUser.id}
-        profileName={target.nombre}
-        profilePhotoUrl={target.fotoUrl}
-        compatibility={score}
-      />
     </main>
   );
 }

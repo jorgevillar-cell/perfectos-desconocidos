@@ -75,6 +75,8 @@ export async function registerAction(
 ): Promise<AuthFormState> {
   const email = getField(formData, "email");
   const password = getField(formData, "password");
+  const userType = getField(formData, "userType");
+  const nextPath = getSafeNextPath(formData);
 
   if (!email || !password) {
     return { error: "Completa tu email y contraseña." };
@@ -84,14 +86,27 @@ export async function registerAction(
     return { error: "Usa una contraseña de al menos 8 caracteres." };
   }
 
+  if (userType !== "propietario" && userType !== "buscador") {
+    return { error: "Selecciona si tienes piso o si buscas piso/companeros." };
+  }
+
   const supabase = await createSupabaseActionClient();
   const { error } = await supabase.auth.signUp({
     email,
     password,
+    options: {
+      data: {
+        user_type: userType,
+      },
+    },
   });
 
   if (error) {
     return { error: error.message };
+  }
+
+  if (nextPath) {
+    redirect(nextPath);
   }
 
   redirect("/onboarding");

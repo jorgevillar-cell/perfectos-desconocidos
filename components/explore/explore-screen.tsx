@@ -3,12 +3,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Map as MapboxMapInstance, Marker } from "mapbox-gl";
 import Link from "next/link";
-import { BrandLogo } from "@/components/brand-logo";
 import { ChatDock } from "@/components/chat/chat-dock";
+import { SiteTopNav } from "@/components/navigation/site-top-nav";
 import type { MatchCelebrationPayload } from "@/lib/chat/types";
+import { smoothScrollToHash } from "@/lib/ui/section-scroll";
 
 export type ExploreProfile = {
   id: string;
+  verificado: boolean;
   nombre: string;
   edad: number;
   ciudad: string;
@@ -29,23 +31,19 @@ export type ExploreProfile = {
   pisoDireccion: string | null;
   pisoCompaneros: number | null;
   pisoFotos: string[];
+  userType: "propietario" | "buscador";
+  companionCount: number;
+  companionNames: string[];
+  companionPhotos: string[];
   compatibilidad: number;
   fotoUrl: string;
   badgeTags: [string, string, string];
 };
 
 export type ExploreScreenProps = {
+  isAuthenticated: boolean;
   currentUserId: string;
   currentUserName: string;
-  currentUserHasPiso: boolean;
-  currentUserPrimaryPiso: {
-    id: string;
-    precio: number;
-    zona: string;
-    direccion: string | null;
-    descripcion: string;
-    fotos: string[];
-  } | null;
   initialCity: string;
   initialProfiles: ExploreProfile[];
   openChatWithUserId?: string | null;
@@ -106,6 +104,7 @@ const CITY_CENTER: Record<string, [number, number]> = {
   barcelona: [2.1734, 41.3851],
   valencia: [-0.3763, 39.4699],
   sevilla: [-5.9845, 37.3891],
+  bilbao: [-2.934985, 43.263012],
   blanes: [2.7903, 41.6731],
 };
 
@@ -130,6 +129,136 @@ const MENU_BUTTON_BASE =
   "inline-flex h-11 items-center gap-2 rounded-[999px] border border-[#D7E3F4] bg-[#EAF1FB] px-4 text-[14px] font-semibold text-[#1A2674] transition hover:border-[#B8CCEB] hover:bg-[#DFEAF9]";
 
 const DEFAULT_MAX_PRICE = 1200;
+
+const EXAMPLE_CASE_CARDS: ExploreProfile[] = [
+  {
+    id: "demo-case-busca-piso",
+    verificado: true,
+    nombre: "Lucia",
+    edad: 24,
+    ciudad: "Madrid",
+    zona: "Chamberi",
+    universidad: "Universidad Complutense de Madrid",
+    situacion: "busco_habitacion",
+    estudiaOTrabaja: "estudiante",
+    esErasmus: false,
+    fumar: false,
+    mascotas: true,
+    horario: "normal",
+    ambiente: "tranquilo",
+    deporte: "algunas",
+    aficiones: ["cine", "lectura"],
+    presupuesto: 750,
+    tienePiso: false,
+    precioPiso: null,
+    pisoDireccion: null,
+    pisoCompaneros: null,
+    pisoFotos: [],
+    userType: "buscador",
+    companionCount: 0,
+    companionNames: [],
+    companionPhotos: [],
+    compatibilidad: 82,
+    fotoUrl: "https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?auto=format&fit=crop&w=900&q=80",
+    badgeTags: ["No fuma", "Mascotas", "Horario normal"],
+  },
+  {
+    id: "demo-case-busca-juntos",
+    verificado: false,
+    nombre: "Ainhoa",
+    edad: 26,
+    ciudad: "Barcelona",
+    zona: "Gracia",
+    universidad: null,
+    situacion: "buscar_juntos",
+    estudiaOTrabaja: "trabajador",
+    esErasmus: false,
+    fumar: false,
+    mascotas: false,
+    horario: "madrugador",
+    ambiente: "equilibrado",
+    deporte: "frecuente",
+    aficiones: ["deporte", "viajes"],
+    presupuesto: 980,
+    tienePiso: false,
+    precioPiso: null,
+    pisoDireccion: null,
+    pisoCompaneros: null,
+    pisoFotos: [],
+    userType: "buscador",
+    companionCount: 0,
+    companionNames: [],
+    companionPhotos: [],
+    compatibilidad: 76,
+    fotoUrl: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=900&q=80",
+    badgeTags: ["No fuma", "Sin mascotas", "Madrugador"],
+  },
+  {
+    id: "demo-case-piso-solo",
+    verificado: true,
+    nombre: "Carla",
+    edad: 29,
+    ciudad: "Valencia",
+    zona: "Ruzafa",
+    universidad: null,
+    situacion: "tengo_piso_libre",
+    estudiaOTrabaja: "trabajador",
+    esErasmus: false,
+    fumar: false,
+    mascotas: true,
+    horario: "normal",
+    ambiente: "tranquilo",
+    deporte: "poco",
+    aficiones: ["musica", "cocina"],
+    presupuesto: 0,
+    tienePiso: true,
+    precioPiso: 620,
+    pisoDireccion: "Calle Sueca, Valencia",
+    pisoCompaneros: 0,
+    pisoFotos: [],
+    userType: "propietario",
+    companionCount: 0,
+    companionNames: [],
+    companionPhotos: [],
+    compatibilidad: 88,
+    fotoUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=900&q=80",
+    badgeTags: ["No fuma", "Mascotas", "Horario normal"],
+  },
+  {
+    id: "demo-case-piso-con-gente",
+    verificado: true,
+    nombre: "Marta",
+    edad: 27,
+    ciudad: "Sevilla",
+    zona: "Nervion",
+    universidad: "Universidad de Sevilla",
+    situacion: "tengo_piso_libre",
+    estudiaOTrabaja: "ambas",
+    esErasmus: false,
+    fumar: false,
+    mascotas: false,
+    horario: "nocturno",
+    ambiente: "social",
+    deporte: "algunas",
+    aficiones: ["viajes", "cine"],
+    presupuesto: 0,
+    tienePiso: true,
+    precioPiso: 540,
+    pisoDireccion: "Avenida San Francisco Javier, Sevilla",
+    pisoCompaneros: 2,
+    pisoFotos: [],
+    userType: "propietario",
+    companionCount: 2,
+    companionNames: ["Alba", "Paula"],
+    companionPhotos: [
+      "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=600&q=80",
+      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80",
+    ],
+    compatibilidad: 72,
+    badgeTags: ["No fuma", "Sin mascotas", "Nocturno"],
+    fotoUrl: "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=900&q=80",
+  },
+];
 
 function normalizeText(value: string) {
   return value
@@ -166,6 +295,22 @@ function formatCurrency(value: number) {
 
 function shortPrice(value: number) {
   return `${Math.round(value)}€`;
+}
+
+function profileMapQuery(profile: ExploreProfile) {
+  if (profile.tienePiso && profile.pisoDireccion?.trim()) {
+    return profile.pisoDireccion.trim();
+  }
+
+  return `${profile.zona}, ${profile.ciudad}`;
+}
+
+function profileMapHref(profile: ExploreProfile) {
+  if (profile.tienePiso) {
+    return `/profile/${profile.id}#mapa`;
+  }
+
+  return `/explore?ciudad=${encodeURIComponent(profile.ciudad)}`;
 }
 
 function prettyLabel(value: string) {
@@ -355,15 +500,24 @@ function ProfileCard({
   profile,
   highlight,
   delay,
-  onSelect,
+  isAuthenticated,
+  onAuthRequired,
 }: {
   profile: ExploreProfile;
   highlight: boolean;
   delay: number;
-  onSelect: (profile: ExploreProfile) => void;
+  isAuthenticated: boolean;
+  onAuthRequired: () => void;
 }) {
   const [filled, setFilled] = useState(false);
   const palette = compatibilityPalette(profile.compatibilidad);
+  const isOwner = profile.userType === "propietario";
+  const ownerCompanionCount = profile.companionCount || profile.pisoCompaneros || 0;
+  const ownerTag = profile.situacion.includes("tengo_piso") ? "Tiene piso libre" : "Propietario";
+  const seekerTag = profile.situacion.includes("buscar_juntos") ? "Busca companero" : "Busca habitacion";
+  const priceBadgeClass = isOwner
+    ? "bg-[#FFF1EE] text-[#C65A54]"
+    : "bg-[#EEF4FF] text-[#1D4ED8]";
 
   useEffect(() => {
     const timer = setTimeout(() => setFilled(true), 80);
@@ -371,97 +525,149 @@ function ProfileCard({
   }, []);
 
   return (
-    <button type="button" onClick={() => onSelect(profile)} className="cursor-pointer text-left">
-      <article
-        className="animate-fade-up relative h-[380px] w-[280px] flex-none overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white"
-        style={{
-          background: CARD_BG,
-          boxShadow: CARD_SHADOW,
-          animationDelay: `${delay}ms`,
-          animationFillMode: "both",
-          transition: "transform 200ms ease, box-shadow 200ms ease",
-        }}
-        onMouseEnter={(event) => {
-          event.currentTarget.style.transform = "translateY(-2px)";
-          event.currentTarget.style.boxShadow = CARD_HOVER_SHADOW;
-        }}
-        onMouseLeave={(event) => {
-          event.currentTarget.style.transform = "translateY(0px)";
-          event.currentTarget.style.boxShadow = CARD_SHADOW;
-        }}
-      >
-        <div className="relative h-[171px]">
-          <img
-            src={withFallbackImage(profile.fotoUrl)}
-            alt={profile.nombre}
-            loading="lazy"
-            className="h-full w-full object-cover"
-          />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/45 to-transparent" />
-          <span
-            className="absolute right-3 top-3 rounded-[999px] px-3 py-1 text-[14px] font-bold"
-            style={{ background: palette.badgeBg, color: palette.badgeText }}
-          >
-            {profile.compatibilidad}%
-          </span>
-        </div>
+    <article
+      className="animate-fade-up relative h-[406px] w-[282px] flex-none overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white"
+      style={{
+        boxShadow: CARD_SHADOW,
+        animationDelay: `${delay}ms`,
+        animationFillMode: "both",
+        transition: "transform 200ms ease, box-shadow 200ms ease",
+      }}
+      onMouseEnter={(event) => {
+        event.currentTarget.style.transform = "translateY(-2px)";
+        event.currentTarget.style.boxShadow = CARD_HOVER_SHADOW;
+      }}
+      onMouseLeave={(event) => {
+        event.currentTarget.style.transform = "translateY(0px)";
+        event.currentTarget.style.boxShadow = CARD_SHADOW;
+      }}
+    >
+      <div className="relative h-[171px]">
+        <img
+          src={withFallbackImage(profile.fotoUrl)}
+          alt={profile.nombre}
+          loading="lazy"
+          className="h-full w-full object-cover"
+        />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/45 to-transparent" />
+        <span
+          className={`absolute right-3 top-3 rounded-[999px] px-3 py-1 text-[14px] font-bold shadow-sm ${priceBadgeClass}`}
+        >
+          {isOwner && profile.precioPiso ? shortPrice(profile.precioPiso) : `${profile.compatibilidad}%`}
+        </span>
+        <span className="absolute left-3 top-3 rounded-[999px] border border-white/65 bg-white/92 px-3 py-1 text-[12px] font-semibold text-[#1F2937]">
+          {isOwner ? ownerTag : seekerTag}
+        </span>
+      </div>
 
-        <div className="flex h-[209px] flex-col p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="truncate text-[16px] font-semibold text-[#1A1A1A]">
-                {profile.nombre}, {profile.edad}
-              </p>
-              {profile.esErasmus ? (
-                <span className="mt-1 inline-flex rounded-full border border-[#93C5FD] bg-[#EFF6FF] px-2 py-0.5 text-[11px] font-semibold text-[#1D4ED8]">
-                  Erasmus
-                </span>
-              ) : null}
-            </div>
-            {profile.tienePiso && profile.precioPiso ? (
-              <span className="text-[16px] font-bold text-[#FF6B6B]">{shortPrice(profile.precioPiso)}</span>
+      <div className="flex h-[235px] flex-col overflow-y-auto p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            {profile.verificado ? (
+              <span className="inline-flex rounded-full border border-[#BFDBFE] bg-[#EFF6FF] px-2 py-0.5 text-[11px] font-semibold text-[#1D4ED8]">
+                ✓ Verificada
+              </span>
+            ) : null}
+            <p className="mt-1 truncate text-[16px] font-semibold text-[#1A1A1A]">
+              {profile.nombre}, {profile.edad}
+            </p>
+            {profile.esErasmus ? (
+              <span className="mt-1 inline-flex rounded-full border border-[#93C5FD] bg-[#EFF6FF] px-2 py-0.5 text-[11px] font-semibold text-[#1D4ED8]">
+                Erasmus
+              </span>
             ) : null}
           </div>
-
-          <p className="mt-2 truncate text-[14px] font-normal leading-6 text-[#6B7280]">
-            {profile.situacion.replaceAll("_", " ")} · {profile.estudiaOTrabaja}
-          </p>
-          <p className="mt-1 truncate text-[14px] font-normal leading-6 text-[#6B7280]">
-            {profile.zona}, {profile.ciudad}
-          </p>
-
-          {profile.tienePiso && profile.pisoCompaneros ? (
-            <p className="mt-1 truncate text-[13px] font-medium text-[#667085]">{profile.pisoCompaneros} en casa actualmente</p>
-          ) : null}
-
-          <div className="mt-3 flex gap-2">
-            {profile.badgeTags.map((tag) => (
-              <span
-                key={`${profile.id}-${tag}`}
-                className="truncate rounded-[999px] bg-[#F3F4F6] px-2 py-1 text-[14px] font-normal text-[#4B5563]"
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
-
-          {highlight ? (
-            <div className="mt-auto">
-              <div className="h-2 overflow-hidden rounded-[999px]" style={{ background: palette.track }}>
-                <div
-                  className="h-full rounded-[999px] transition-all duration-700 ease-out"
-                  style={{
-                    background: palette.fill,
-                    boxShadow: "0 2px 10px rgba(15, 23, 42, 0.12)",
-                    width: filled ? `${profile.compatibilidad}%` : "0%",
-                  }}
-                />
-              </div>
-            </div>
+          {!isOwner ? (
+            <span className="text-[16px] font-bold text-[#C65A54]">{shortPrice(profile.presupuesto)}</span>
+          ) : profile.tienePiso && profile.precioPiso ? (
+            <span className="text-[16px] font-bold text-[#C65A54]">{shortPrice(profile.precioPiso)}</span>
           ) : null}
         </div>
-      </article>
-    </button>
+
+        <p className="mt-2 truncate text-[14px] font-normal leading-6 text-[#6B7280]">
+          {isOwner ? `Zona ${profile.zona}` : `${profile.situacion.replaceAll("_", " ")} · ${profile.estudiaOTrabaja}`}
+        </p>
+        <a
+          href={profileMapHref(profile)}
+          onClick={(event) => event.stopPropagation()}
+          className="mt-1 truncate text-[14px] font-normal leading-6 text-[#4B6B9A] underline-offset-2 transition hover:underline"
+          title={isOwner ? profile.pisoDireccion ?? `${profile.zona}, ${profile.ciudad}` : `${profile.zona}, ${profile.ciudad}`}
+        >
+          {isOwner ? profile.pisoDireccion ?? `${profile.zona}, ${profile.ciudad}` : `${profile.zona}, ${profile.ciudad}`}
+        </a>
+
+        {isOwner && ownerCompanionCount > 0 ? (
+          <p className="mt-1 truncate text-[13px] font-medium text-[#667085]">Viviras con {ownerCompanionCount} personas mas</p>
+        ) : null}
+
+        {isOwner && profile.companionPhotos.length ? (
+          <div className="mt-2 flex items-center gap-2">
+            <div className="flex -space-x-2">
+              {profile.companionPhotos.slice(0, 3).map((photo, index) => (
+                <img
+                  key={`${profile.id}-companion-photo-${index}`}
+                  src={withFallbackImage(photo)}
+                  alt={`companero-${index + 1}`}
+                  className="h-7 w-7 rounded-full border-2 border-white object-cover"
+                />
+              ))}
+            </div>
+            {ownerCompanionCount > 3 ? (
+              <span className="text-[12px] font-semibold text-[#6B7280]">+{ownerCompanionCount - 3}</span>
+            ) : null}
+          </div>
+        ) : null}
+
+        <div className="mt-3 flex gap-2">
+          {profile.badgeTags.map((tag) => (
+            <span
+              key={`${profile.id}-${tag}`}
+              className="truncate rounded-[999px] bg-[#F3F4F6] px-2 py-1 text-[12px] font-semibold text-[#4B5563]"
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
+
+        {highlight ? (
+          <div className="mt-3">
+            <div className="h-2 overflow-hidden rounded-[999px]" style={{ background: palette.track }}>
+              <div
+                className="h-full rounded-[999px] transition-all duration-700 ease-out"
+                style={{
+                  background: palette.fill,
+                  boxShadow: "0 2px 10px rgba(15, 23, 42, 0.12)",
+                  width: filled ? `${profile.compatibilidad}%` : "0%",
+                }}
+              />
+            </div>
+          </div>
+        ) : null}
+
+        <div className="mt-auto grid grid-cols-2 gap-2 pt-3">
+          <Link
+            href={`/profile/${profile.id}`}
+            className="inline-flex h-9 items-center justify-center rounded-xl border border-[#D0D5DD] bg-white px-3 text-[12px] font-semibold text-[#1F2937] transition hover:border-[#98A2B3] hover:bg-[#F9FAFB]"
+          >
+            Ver perfil
+          </Link>
+          <button
+            type="button"
+            onClick={() => {
+              if (!isAuthenticated) {
+                onAuthRequired();
+                return;
+              }
+
+              window.location.assign(`/profile/${profile.id}?solicitar=1`);
+            }}
+            className="inline-flex h-9 items-center justify-center rounded-xl bg-[#FF6B6B] px-3 text-[12px] font-semibold text-white transition hover:bg-[#F45C5C]"
+          >
+            Solicitar
+          </button>
+        </div>
+      </div>
+    </article>
   );
 }
 
@@ -563,12 +769,16 @@ function ProfileLocationMap({
 
 function ProfileExpandedModal({
   profile,
+  isAuthenticated,
   onClose,
   onOpenChat,
+  onAuthRequired,
 }: {
   profile: ExploreProfile;
+  isAuthenticated: boolean;
   onClose: () => void;
   onOpenChat: (userId: string) => void;
+  onAuthRequired: () => void;
 }) {
   const [entered, setEntered] = useState(false);
   const [sheetOffset, setSheetOffset] = useState(0);
@@ -624,7 +834,7 @@ function ProfileExpandedModal({
       <button type="button" onClick={onClose} className="absolute inset-0" aria-label="Cerrar detalle" />
 
       <article
-        className={`relative z-10 h-[92vh] w-full overflow-hidden rounded-t-3xl bg-[#F7FAFC] transition-all duration-300 sm:h-auto sm:max-h-[90vh] sm:w-[min(980px,94vw)] sm:rounded-3xl ${
+        className={`relative z-10 h-[92vh] w-full overflow-hidden rounded-t-3xl bg-[#F8FBFF] transition-all duration-300 sm:h-auto sm:max-h-[90vh] sm:w-[min(980px,94vw)] sm:rounded-3xl ${
           entered ? "opacity-100" : "opacity-0"
         }`}
         style={{
@@ -640,7 +850,7 @@ function ProfileExpandedModal({
           <div className="grid min-h-[260px] grid-rows-2 gap-3 p-3 sm:min-h-[620px] sm:p-4">
             <div className="relative h-full overflow-hidden rounded-2xl border border-[#D6E4F1] bg-white">
               <img src={withFallbackImage(profile.fotoUrl)} alt={profile.nombre} className="h-full w-full object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#081A3A]/70 via-transparent to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#06152D]/68 via-[#06152D]/15 to-transparent" />
 
               <button
                 type="button"
@@ -655,10 +865,10 @@ function ProfileExpandedModal({
               </button>
 
               <div className="absolute bottom-4 left-4 right-4">
-                <div className="inline-flex rounded-full border border-white/45 bg-white/15 px-3 py-1 text-[13px] font-semibold text-white backdrop-blur">
+                <div className="inline-flex rounded-full border border-white/40 bg-white/22 px-3 py-1 text-[13px] font-semibold text-white backdrop-blur">
                   Compatibilidad {profile.compatibilidad}%
                 </div>
-                <h3 className="mt-2 text-[32px] font-black tracking-tight text-white">{profile.nombre}, {profile.edad}</h3>
+                <h3 className="mt-2 text-[34px] font-black tracking-tight text-white">{profile.nombre}, {profile.edad}</h3>
                 <p className="text-[14px] font-medium text-white/85">{profile.zona}, {profile.ciudad}</p>
                 {profile.esErasmus ? (
                   <span className="mt-2 inline-flex rounded-full border border-white/40 bg-white/20 px-2.5 py-1 text-[12px] font-semibold text-white">
@@ -678,20 +888,25 @@ function ProfileExpandedModal({
             </div>
           </div>
 
-          <div className="flex h-full flex-col overflow-y-auto bg-[#F7FAFC] p-6 sm:p-8">
+          <div className="flex h-full flex-col overflow-y-auto bg-[#F8FBFF] p-6 sm:p-8">
             <div
               className={`flex items-center justify-between gap-3 transition-all duration-500 ${
                 entered ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0"
               }`}
               style={{ transitionDelay: "70ms" }}
             >
-              <div className="inline-flex items-center gap-2 rounded-full bg-[#0F766E]/12 px-3 py-2 text-[13px] font-semibold text-[#0F766E]">
-                <span className="inline-block h-2 w-2 rounded-full bg-[#0F766E]" />
-                {profile.tienePiso ? "Tiene apartamento disponible" : "Busca apartamento"}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex items-center gap-2 rounded-full bg-[#0F766E]/10 px-3 py-2 text-[13px] font-semibold text-[#0F766E]">
+                  <span className="inline-block h-2 w-2 rounded-full bg-[#0F766E]" />
+                  {profile.tienePiso ? "Tiene apartamento disponible" : "Busca apartamento"}
+                </div>
+                <span className="inline-flex items-center rounded-full bg-[#E8F1FF] px-3 py-1.5 text-[12px] font-semibold text-[#285AA1]">
+                  {profile.verificado ? "✓ Verificada" : "Sin verificar"}
+                </span>
               </div>
-              <div className="rounded-2xl bg-[#0B1025] px-4 py-3 text-right text-white">
-                <p className="text-[11px] uppercase tracking-[0.08em] text-white/70">Presupuesto</p>
-                <p className="text-[22px] font-black">{formatCurrency(budgetValue)}</p>
+              <div className="rounded-2xl border border-[#FFD6CC] bg-[#FFF5F2] px-4 py-3 text-right text-[#7A2E2A] shadow-sm">
+                <p className="text-[11px] uppercase tracking-[0.08em] text-[#A24A44]">{profile.userType === "propietario" ? "Precio habitacion" : "Presupuesto"}</p>
+                <p className="text-[23px] font-black text-[#9F3D36]">{formatCurrency(budgetValue)}</p>
               </div>
             </div>
 
@@ -708,16 +923,44 @@ function ProfileExpandedModal({
               {profile.tienePiso && profile.precioPiso ? (
                 <p className="mt-1 text-[14px] font-semibold text-[#1D4ED8]">Alquiler: {formatCurrency(profile.precioPiso)}/mes</p>
               ) : null}
-              {profile.tienePiso && profile.pisoDireccion ? (
-                <p className="mt-1 text-[13px] text-[#52606D]">{profile.pisoDireccion}</p>
-              ) : null}
-              {profile.tienePiso && profile.pisoCompaneros ? (
-                <p className="mt-1 text-[13px] text-[#52606D]">{profile.pisoCompaneros} personas viviendo actualmente</p>
+              <Link href={profileMapHref(profile)} className="mt-1 inline-block text-[13px] font-semibold text-[#285AA1] underline-offset-2 transition hover:underline">
+                {profile.tienePiso
+                  ? `Ver ubicacion: ${profile.pisoDireccion?.trim() || `${profile.zona}, ${profile.ciudad}`}`
+                  : `Zona donde quiere vivir: ${profile.zona}, ${profile.ciudad}`}
+              </Link>
+              {profile.userType === "propietario" && (profile.companionCount || profile.pisoCompaneros || 0) > 0 ? (
+                <p className="mt-1 text-[13px] text-[#52606D]">Viviras con {profile.companionCount || profile.pisoCompaneros} personas</p>
               ) : null}
               {hasUniversity ? (
                 <p className="mt-1 text-[14px] text-[#52606D]">{profile.universidad}</p>
               ) : null}
             </div>
+
+            {profile.userType === "propietario" && (profile.companionNames.length || profile.companionPhotos.length) ? (
+              <div
+                className={`mt-4 rounded-2xl border border-[#D6E4F1] bg-white p-4 transition-all duration-500 ${
+                  entered ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0"
+                }`}
+                style={{ transitionDelay: "195ms" }}
+              >
+                <p className="text-[12px] font-bold uppercase tracking-[0.08em] text-[#6C7A89]">Con quien viviras</p>
+                {profile.companionPhotos.length ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {profile.companionPhotos.map((photo, index) => (
+                      <img
+                        key={`${profile.id}-modal-companion-photo-${index}`}
+                        src={withFallbackImage(photo)}
+                        alt={profile.companionNames[index] ?? `companero-${index + 1}`}
+                        className="h-12 w-12 rounded-xl border border-[#D9E3F0] object-cover"
+                      />
+                    ))}
+                  </div>
+                ) : null}
+                {profile.companionNames.length ? (
+                  <p className="mt-2 text-[14px] text-[#334155]">{profile.companionNames.join(", ")}</p>
+                ) : null}
+              </div>
+            ) : null}
 
             <div
               className={`mt-4 rounded-2xl border border-[#D6E4F1] bg-white p-4 transition-all duration-500 ${
@@ -752,21 +995,28 @@ function ProfileExpandedModal({
             </div>
 
             <div
-              className={`mt-6 flex flex-col gap-3 transition-all duration-500 sm:flex-row ${
+              className={`sticky bottom-0 mt-5 flex flex-col gap-3 border-t border-[#E2E8F0] bg-[#F8FBFF]/95 pt-4 backdrop-blur transition-all duration-500 sm:flex-row ${
                 entered ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0"
               }`}
               style={{ transitionDelay: "280ms" }}
             >
               <button
                 type="button"
-                onClick={() => onOpenChat(profile.id)}
-                className="inline-flex h-12 flex-1 items-center justify-center rounded-xl bg-[#0B1025] px-5 text-[15px] font-bold text-white transition hover:bg-[#162043]"
+                onClick={() => {
+                  if (!isAuthenticated) {
+                    onAuthRequired();
+                    return;
+                  }
+
+                  window.location.assign(`/profile/${profile.id}?solicitar=1`);
+                }}
+                className="inline-flex h-12 flex-1 items-center justify-center rounded-xl bg-[#FF6B6B] px-5 text-[15px] font-bold text-white transition hover:bg-[#F45C5C]"
               >
-                Enviar mensaje
+                Enviar solicitud
               </button>
               <Link
                 href={`/profile/${profile.id}`}
-                className="inline-flex h-12 flex-1 items-center justify-center rounded-xl border border-[#0B1025]/20 bg-white px-5 text-[15px] font-bold text-[#0B1025] transition hover:border-[#0B1025]"
+                className="inline-flex h-12 flex-1 items-center justify-center rounded-xl border border-[#CBD5E1] bg-white px-5 text-[15px] font-bold text-[#334155] transition hover:border-[#94A3B8] hover:bg-[#F8FAFC]"
               >
                 Ver perfil completo
               </Link>
@@ -809,10 +1059,13 @@ function ExploreMap({
 }) {
   const [selected, setSelected] = useState<ExploreProfile | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  const [resolvedCoordinates, setResolvedCoordinates] = useState<Record<string, [number, number]>>({});
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapboxMapInstance | null>(null);
   const markersRef = useRef<Marker[]>([]);
+  const geocodeCacheRef = useRef<Record<string, [number, number]>>({});
   const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+  const mappableProfiles = useMemo(() => profiles.filter((profile) => profile.tienePiso), [profiles]);
 
   const center = useMemo(
     () => selectedCenter ?? CITY_CENTER[normalizeText(city)] ?? CITY_CENTER.madrid,
@@ -877,6 +1130,77 @@ function ExploreMap({
   }, [center, mapReady]);
 
   useEffect(() => {
+    let active = true;
+    const controller = new AbortController();
+
+    void (async () => {
+      const next: Record<string, [number, number]> = {};
+
+      await Promise.all(
+        mappableProfiles.slice(0, 40).map(async (profile) => {
+          const fallback = mapCoordinates(profile.ciudad, profile.zona, profile.id);
+          const baseQuery = profileMapQuery(profile);
+          const query = baseQuery.includes(profile.ciudad) ? baseQuery : `${baseQuery}, ${profile.ciudad}`;
+          const cacheKey = normalizeText(query);
+
+          if (geocodeCacheRef.current[cacheKey]) {
+            next[profile.id] = geocodeCacheRef.current[cacheKey];
+            return;
+          }
+
+          if (!token) {
+            next[profile.id] = fallback;
+            return;
+          }
+
+          try {
+            const response = await fetch(
+              `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?autocomplete=false&types=address,neighborhood,place,locality&country=es&language=es&limit=1&access_token=${token}`,
+              { signal: controller.signal },
+            );
+
+            const payload = (await response.json()) as {
+              features?: Array<{ center?: [number, number] }>;
+            };
+
+            const centerPoint = payload.features?.[0]?.center;
+            if (centerPoint && Array.isArray(centerPoint) && centerPoint.length === 2) {
+              const resolved: [number, number] = [centerPoint[0], centerPoint[1]];
+              geocodeCacheRef.current[cacheKey] = resolved;
+              next[profile.id] = resolved;
+              return;
+            }
+
+            next[profile.id] = fallback;
+          } catch {
+            next[profile.id] = fallback;
+          }
+        }),
+      );
+
+      if (active) {
+        setResolvedCoordinates(next);
+      }
+    })();
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [mappableProfiles, token]);
+
+  useEffect(() => {
+    if (!selected) {
+      return;
+    }
+
+    const stillVisible = mappableProfiles.some((profile) => profile.id === selected.id);
+    if (!stillVisible) {
+      setSelected(null);
+    }
+  }, [mappableProfiles, selected]);
+
+  useEffect(() => {
     if (!mapRef.current) {
       return;
     }
@@ -894,8 +1218,8 @@ function ExploreMap({
 
       const mapboxgl = mapboxModule.default;
 
-      profiles.slice(0, 40).forEach((profile) => {
-        const [lng, lat] = mapCoordinates(profile.ciudad, profile.zona, profile.id);
+      mappableProfiles.slice(0, 40).forEach((profile) => {
+        const [lng, lat] = resolvedCoordinates[profile.id] ?? mapCoordinates(profile.ciudad, profile.zona, profile.id);
         const highAffinity = profile.compatibilidad >= 70;
         const markerElement = document.createElement("button");
         markerElement.type = "button";
@@ -927,7 +1251,7 @@ function ExploreMap({
     return () => {
       alive = false;
     };
-  }, [mapReady, profiles]);
+  }, [mapReady, mappableProfiles, resolvedCoordinates]);
 
   if (!token) {
     return (
@@ -944,8 +1268,16 @@ function ExploreMap({
     <div className="relative h-[280px] w-full overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white sm:h-[360px]" style={{ boxShadow: CARD_SHADOW }}>
       <div ref={containerRef} className="h-full w-full" />
 
+      {!mappableProfiles.length ? (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-white/78 p-4 text-center">
+          <p className="max-w-xs rounded-xl border border-[#E5E7EB] bg-white/95 px-4 py-3 text-[13px] font-semibold text-[#475467]" style={{ boxShadow: CARD_SHADOW }}>
+            No hay perfiles con piso disponible para mostrar en el mapa con los filtros actuales.
+          </p>
+        </div>
+      ) : null}
+
       {selected ? (
-        <div className="pointer-events-none absolute bottom-4 left-4 right-4 rounded-2xl border border-[#E5E7EB] bg-white p-3" style={{ boxShadow: CARD_SHADOW }}>
+        <div className="absolute bottom-4 left-4 right-4 rounded-2xl border border-[#E5E7EB] bg-white p-3" style={{ boxShadow: CARD_SHADOW }}>
           <div className="flex items-center gap-3">
             <img
               src={withFallbackImage(selected.fotoUrl)}
@@ -953,13 +1285,24 @@ function ExploreMap({
               className="h-14 w-14 rounded-xl object-cover"
               loading="lazy"
             />
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="truncate text-[16px] font-semibold text-[#1A1A1A]">{selected.nombre}</p>
               <p className="text-[14px] font-bold text-[#FF6B6B]">{selected.compatibilidad}% de compatibilidad</p>
               {selected.tienePiso && selected.precioPiso ? (
                 <p className="text-[12px] font-semibold text-[#1D4ED8]">Alquila por {shortPrice(selected.precioPiso)}</p>
               ) : null}
+              <p className="truncate text-[12px] text-[#6B7280]">
+                {selected.tienePiso
+                  ? selected.pisoDireccion || `${selected.zona}, ${selected.ciudad}`
+                  : `Busca piso en ${selected.zona}, ${selected.ciudad}`}
+              </p>
             </div>
+            <Link
+              href={`/profile/${selected.id}`}
+              className="inline-flex h-10 items-center rounded-xl border border-[#D0D5DD] bg-[#F9FAFB] px-3 text-[13px] font-semibold text-[#1D2939] transition hover:bg-[#F3F4F6]"
+            >
+              Ver perfil
+            </Link>
           </div>
         </div>
       ) : null}
@@ -968,21 +1311,21 @@ function ExploreMap({
 }
 
 export function ExploreScreen({
+  isAuthenticated,
   currentUserId,
   currentUserName,
-  currentUserHasPiso,
-  currentUserPrimaryPiso,
   initialCity,
   initialProfiles,
   openChatWithUserId,
   initialCelebration,
 }: ExploreScreenProps) {
-  const [cityQuery, setCityQuery] = useState("");
+  const [cityQuery, setCityQuery] = useState(initialCity);
   const [citySuggestions, setCitySuggestions] = useState<CitySuggestion[]>([]);
   const [cityMenuOpen, setCityMenuOpen] = useState(false);
   const [selectedCity, setSelectedCity] = useState<CitySuggestion | null>(null);
   const [isLoadingCities, setIsLoadingCities] = useState(false);
   const [expandedProfile, setExpandedProfile] = useState<ExploreProfile | null>(null);
+  const [isAuthRequiredOpen, setIsAuthRequiredOpen] = useState(false);
   const [chatTargetUserId, setChatTargetUserId] = useState<string | null>(openChatWithUserId ?? null);
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
   const [selectedHobbies, setSelectedHobbies] = useState<string[]>([]);
@@ -1064,6 +1407,82 @@ export function ExploreScreen({
   useEffect(() => {
     setChatTargetUserId(openChatWithUserId ?? null);
   }, [openChatWithUserId]);
+
+  useEffect(() => {
+    const targets = Array.from(document.querySelectorAll<HTMLElement>("[data-reveal='section']"));
+    if (!targets.length) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+          }
+        }
+      },
+      { threshold: 0.12, rootMargin: "0px 0px -7% 0px" },
+    );
+
+    targets.forEach((target) => observer.observe(target));
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!initialCity) {
+      return;
+    }
+
+    setCityQuery(initialCity);
+
+    const normalizedInitial = normalizeText(initialCity);
+    const cachedCenter = CITY_CENTER[normalizedInitial];
+    if (cachedCenter) {
+      setSelectedCity({
+        id: initialCity,
+        city: initialCity,
+        label: `${initialCity}, Espana`,
+        center: cachedCenter,
+      });
+      return;
+    }
+
+    let active = true;
+
+    void (async () => {
+      if (!mapboxToken) {
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(initialCity)}.json?autocomplete=true&types=place,locality&country=es&language=es&limit=1&access_token=${mapboxToken}`,
+        );
+
+        const payload = (await response.json()) as {
+          features?: Array<{ id: string; text?: string; place_name?: string; center?: [number, number] }>;
+        };
+
+        const feature = payload.features?.[0];
+        if (!active || !feature?.center) {
+          return;
+        }
+
+        setSelectedCity({
+          id: feature.id,
+          city: feature.text ?? initialCity,
+          label: feature.place_name ?? `${initialCity}, Espana`,
+          center: [feature.center[0], feature.center[1]],
+        });
+      } catch {
+        if (!active) return;
+        setSelectedCity(null);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [initialCity, mapboxToken]);
 
   useEffect(() => {
     const search = cityQuery.trim();
@@ -1210,15 +1629,12 @@ export function ExploreScreen({
   }
 
   return (
-    <main className="min-h-screen bg-[#F8F8F8] pr-16 text-[#1A1A1A] max-sm:pr-0">
-      <div className="sticky top-0 z-30 bg-white" style={{ boxShadow: CARD_SHADOW }}>
-        <header className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6 lg:px-8">
-          <div className="min-w-[300px]">
-            <BrandLogo className="h-16 w-auto" />
-          </div>
-
-          <div className="flex flex-1 items-center justify-center">
-            <div ref={cityPickerRef} className="relative w-full max-w-[420px]">
+    <main id="top" className="min-h-screen bg-[#F8F8F8] pr-16 text-[#1A1A1A] max-sm:pr-0">
+      <SiteTopNav currentPath="/explore" />
+      <div className="sticky top-[73px] z-30 bg-white" style={{ boxShadow: CARD_SHADOW }}>
+        <header className="mx-auto max-w-7xl px-4 pt-3 pb-0 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-center">
+            <div ref={cityPickerRef} className="relative w-full max-w-[560px]">
               <label className="relative block w-full">
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7280]">
                 <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -1235,7 +1651,7 @@ export function ExploreScreen({
                   }
                 }}
                 placeholder="Escribe ciudad o pueblo (Espana)"
-                className="h-10 w-full rounded-[10px] border border-[#E5E7EB] bg-[#F8F8F8] pl-10 pr-10 text-[14px] font-normal text-[#1A1A1A] outline-none transition focus:border-[#FF6B6B]"
+                className="h-11 w-full rounded-2xl border border-[#E5E7EB] bg-white pl-10 pr-10 text-[14px] font-normal text-[#1A1A1A] shadow-sm outline-none transition focus:border-[#FF6B6B] focus:ring-2 focus:ring-[#FF6B6B]/10"
               />
               </label>
 
@@ -1292,7 +1708,6 @@ export function ExploreScreen({
               ) : null}
             </div>
           </div>
-
         </header>
 
         <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
@@ -1447,7 +1862,29 @@ export function ExploreScreen({
           </p>
         ) : null}
 
-        <ExploreMap city={selectedCity?.city || initialCity} profiles={filteredProfiles} selectedCenter={selectedCity?.center ?? null} />
+        <ExploreMap city={selectedCity?.city || cityQuery || initialCity} profiles={filteredProfiles} selectedCenter={selectedCity?.center ?? null} />
+        <p className="mt-2 text-[12px] text-[#6B7280]">* Solo las personas que tienen piso aparecen en el mapa.</p>
+
+        <section className="mt-6">
+          <SectionTitle title="Tarjetas de ejemplo (4 casos)" count={EXAMPLE_CASE_CARDS.length} />
+          <p className="mb-3 text-[13px] text-[#667085]">
+            Vista previa para los cuatro escenarios: busca piso, busca para compartir, tiene piso solo y tiene piso con companeras.
+          </p>
+          <div className="overflow-x-auto pb-1">
+            <div className="flex min-w-max gap-4">
+              {EXAMPLE_CASE_CARDS.map((profile, index) => (
+                <ProfileCard
+                  key={profile.id}
+                  profile={profile}
+                  highlight
+                  delay={index * 40}
+                  isAuthenticated={isAuthenticated}
+                  onAuthRequired={() => setIsAuthRequiredOpen(true)}
+                />
+              ))}
+            </div>
+          </div>
+        </section>
 
         <section className="mt-6">
           <SectionTitle title="Mas compatibles contigo" count={featured.length} />
@@ -1455,7 +1892,14 @@ export function ExploreScreen({
             <div className="overflow-x-auto pb-1">
               <div className="flex min-w-max gap-4">
                 {featured.map((profile, index) => (
-                  <ProfileCard key={profile.id} profile={profile} highlight delay={index * 50} onSelect={setExpandedProfile} />
+                  <ProfileCard
+                    key={profile.id}
+                    profile={profile}
+                    highlight
+                    delay={index * 50}
+                    isAuthenticated={isAuthenticated}
+                    onAuthRequired={() => setIsAuthRequiredOpen(true)}
+                  />
                 ))}
               </div>
             </div>
@@ -1470,7 +1914,14 @@ export function ExploreScreen({
             <div className="overflow-x-auto pb-1">
               <div className="flex min-w-max gap-4">
                 {others.map((profile, index) => (
-                  <ProfileCard key={profile.id} profile={profile} highlight={false} delay={index * 50} onSelect={setExpandedProfile} />
+                  <ProfileCard
+                    key={profile.id}
+                    profile={profile}
+                    highlight={false}
+                    delay={index * 50}
+                    isAuthenticated={isAuthenticated}
+                    onAuthRequired={() => setIsAuthRequiredOpen(true)}
+                  />
                 ))}
               </div>
             </div>
@@ -1480,13 +1931,80 @@ export function ExploreScreen({
             </div>
           )}
         </section>
+
+        <section id="como-funciona" data-reveal="section" className="section-reveal mt-10 overflow-hidden rounded-[34px] border border-[#E7D6D2] bg-[linear-gradient(180deg,#FFF4F1_0%,#FFFDFD_100%)] p-6 sm:p-8" style={{ boxShadow: CARD_SHADOW }}>
+          <div className="pointer-events-none absolute" />
+          <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#B35C52]">Como funciona</p>
+          <h2 className="mt-2 max-w-3xl text-[29px] font-bold leading-tight text-[#1A1A1A] sm:text-[36px]">
+            Buscas, comparas y contactas en tres pasos claros
+          </h2>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-3">
+            <article className="rounded-3xl border border-[#F3DEDA] bg-white p-5 shadow-[0_10px_20px_rgba(15,23,42,0.05)]">
+              <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[#F3D2CB] bg-[#FFF3EF] text-[14px] font-bold text-[#B35C52]">01</span>
+              <h3 className="mt-3 text-[24px] font-semibold leading-snug text-[#0F766E]">Filtra tu busqueda</h3>
+              <p className="mt-2 text-[14px] leading-6 text-[#4B5563]">Ciudad, presupuesto y estilo de convivencia para ver solo perfiles que encajan.</p>
+            </article>
+            <article className="rounded-3xl border border-[#F3DEDA] bg-white p-5 shadow-[0_10px_20px_rgba(15,23,42,0.05)]">
+              <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[#F3D2CB] bg-[#FFF3EF] text-[14px] font-bold text-[#B35C52]">02</span>
+              <h3 className="mt-3 text-[24px] font-semibold leading-snug text-[#0F766E]">Revisa compatibilidad</h3>
+              <p className="mt-2 text-[14px] leading-6 text-[#4B5563]">Compara habitos, ambiente y contexto del piso para decidir con informacion real.</p>
+            </article>
+            <article className="rounded-3xl border border-[#F3DEDA] bg-white p-5 shadow-[0_10px_20px_rgba(15,23,42,0.05)]">
+              <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[#F3D2CB] bg-[#FFF3EF] text-[14px] font-bold text-[#B35C52]">03</span>
+              <h3 className="mt-3 text-[24px] font-semibold leading-snug text-[#0F766E]">Solicita contacto</h3>
+              <p className="mt-2 text-[14px] leading-6 text-[#4B5563]">Si te interesa, abres solicitud y continuais la conversacion en privado.</p>
+            </article>
+          </div>
+        </section>
+
+        <section id="contacto" data-reveal="section" className="section-reveal mt-6 rounded-[30px] border border-[#E7EAF1] bg-[#F7F9FC] p-6 sm:p-8" style={{ boxShadow: CARD_SHADOW }}>
+          <div className="grid gap-7 lg:grid-cols-[1.35fr_0.75fr_1fr]">
+            <div>
+              <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#B35C52]">Contacto</p>
+              <h2 className="mt-2 text-[28px] font-bold leading-tight text-[#1F2937] sm:text-[34px]">¿Necesitas ayuda para empezar?</h2>
+              <p className="mt-2 text-[14px] leading-7 text-[#6B7280]">
+                Escríbenos y te guiamos con el alta del perfil, filtros y primeras solicitudes.
+              </p>
+
+              <div className="mt-5 flex flex-wrap gap-3">
+                <a
+                  href="mailto:hola@perfectosdesconocidos.app"
+                  className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#FF6B6B] px-5 text-[14px] font-semibold text-white transition hover:bg-[#F45C5C]"
+                >
+                  hola@perfectosdesconocidos.app
+                </a>
+                <a
+                  href="tel:+34911000000"
+                  className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[#D8DEE8] bg-white px-5 text-[14px] font-semibold text-[#1F2937]"
+                >
+                  +34 911 00 00 00
+                </a>
+              </div>
+            </div>
+
+            <div className="space-y-2 text-[16px] font-semibold text-[#0F172A]">
+              <button type="button" onClick={() => smoothScrollToHash("#como-funciona", 160)} className="block text-left transition hover:text-[#FF6B6B]">Como funciona</button>
+              <button type="button" onClick={() => smoothScrollToHash("#top", 0)} className="block text-left transition hover:text-[#FF6B6B]">Volver arriba</button>
+              <Link href="/register" className="block transition hover:text-[#FF6B6B]">Crear cuenta</Link>
+            </div>
+
+            <div>
+              <p className="text-[14px] font-semibold text-[#111827]">Calle Fray Antonio Alcala 10, 44100 Guadalajara, Jal., Mexico</p>
+              <div className="mt-3 flex gap-2">
+                {["in", "x", "f", "ig"].map((social) => (
+                  <span key={social} className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#111827] text-[12px] font-bold text-white">{social}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
 
       <ChatDock
+        isAuthenticated={isAuthenticated}
         currentUserId={currentUserId}
         currentUserName={currentUserName}
-        currentUserHasPiso={currentUserHasPiso}
-        currentUserPrimaryPiso={currentUserPrimaryPiso}
         openChatWithUserId={chatTargetUserId}
         initialCelebration={initialCelebration}
       />
@@ -1494,9 +2012,51 @@ export function ExploreScreen({
       {expandedProfile ? (
         <ProfileExpandedModal
           profile={expandedProfile}
+          isAuthenticated={isAuthenticated}
           onClose={() => setExpandedProfile(null)}
           onOpenChat={openChatForProfile}
+          onAuthRequired={() => setIsAuthRequiredOpen(true)}
         />
+      ) : null}
+
+      {isAuthRequiredOpen ? (
+        <div className="fixed inset-0 z-[130] flex items-end justify-center bg-slate-950/40 p-4 sm:items-center">
+          <div className="w-full max-w-lg rounded-3xl border border-[#F0D8D3] bg-[#FFF8F5] p-5 shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#B35C52]">Necesitas cuenta</p>
+                <h2 className="mt-2 text-[22px] font-semibold text-[#1F2937]">Crea tu cuenta para contactar</h2>
+                <p className="mt-1 text-[14px] leading-6 text-[#6B7280]">
+                  Para contactar con esta persona necesitas crear una cuenta. Es gratis y solo tarda 2 minutos.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAuthRequiredOpen(false)}
+                className="rounded-full border border-[#E5E7EB] bg-white px-3 py-1.5 text-[13px] font-semibold text-[#4B5563]"
+              >
+                Cerrar
+              </button>
+            </div>
+
+            <div className="mt-5 grid grid-cols-2 gap-3 max-sm:grid-cols-1">
+              <button
+                type="button"
+                onClick={() => smoothScrollToHash("#como-funciona", 160)}
+                className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-[#FF6B6B] px-4 text-[15px] font-semibold text-white"
+              >
+                Como funciona
+              </button>
+              <button
+                type="button"
+                onClick={() => smoothScrollToHash("#contacto", 160)}
+                className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-[#E5E7EB] bg-white px-4 text-[15px] font-semibold text-[#4B5563]"
+              >
+                Contacto
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
     </main>
   );

@@ -10,5 +10,8 @@ export default async function OnboardingPage() {
     redirect("/login");
   }
 
-  return <OnboardingFlow userId={user.id} email={user.email ?? ""} />;
+  const metaType = user.user_metadata?.user_type;
+  const userType = metaType === "propietario" ? "propietario" : "buscador";
+
+  return <OnboardingFlow userId={user.id} email={user.email ?? ""} userType={userType} />;
 }
