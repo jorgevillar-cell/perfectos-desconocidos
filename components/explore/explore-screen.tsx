@@ -1631,7 +1631,7 @@ export function ExploreScreen({
   return (
     <main id="top" className="min-h-screen bg-[#F8F8F8] pr-16 text-[#1A1A1A] max-sm:pr-0">
       <SiteTopNav currentPath="/explore" />
-      <div className="sticky top-[73px] z-30 bg-white" style={{ boxShadow: CARD_SHADOW }}>
+      <div className="sticky top-[84px] z-30 bg-white" style={{ boxShadow: CARD_SHADOW }}>
         <header className="mx-auto max-w-7xl px-4 pt-3 pb-0 sm:px-6 lg:px-8">
           <div className="flex items-center justify-center">
             <div ref={cityPickerRef} className="relative w-full max-w-[560px]">
@@ -1932,14 +1932,16 @@ export function ExploreScreen({
           )}
         </section>
 
-        <section id="como-funciona" data-reveal="section" className="section-reveal mt-10 overflow-hidden rounded-[34px] border border-[#E7D6D2] bg-[linear-gradient(180deg,#FFF4F1_0%,#FFFDFD_100%)] p-6 sm:p-8" style={{ boxShadow: CARD_SHADOW }}>
-          <div className="pointer-events-none absolute" />
+      </div>
+
+      <section id="como-funciona" className="w-full bg-[#FFF4F1] px-4 py-14 sm:px-8 lg:py-20">
+        <div className="mx-auto max-w-7xl pr-16 max-sm:pr-0">
           <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#B35C52]">Como funciona</p>
           <h2 className="mt-2 max-w-3xl text-[29px] font-bold leading-tight text-[#1A1A1A] sm:text-[36px]">
             Buscas, comparas y contactas en tres pasos claros
           </h2>
 
-          <div className="mt-5 grid gap-3 md:grid-cols-3">
+          <div className="mt-8 grid gap-4 md:grid-cols-3">
             <article className="rounded-3xl border border-[#F3DEDA] bg-white p-5 shadow-[0_10px_20px_rgba(15,23,42,0.05)]">
               <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[#F3D2CB] bg-[#FFF3EF] text-[14px] font-bold text-[#B35C52]">01</span>
               <h3 className="mt-3 text-[24px] font-semibold leading-snug text-[#0F766E]">Filtra tu busqueda</h3>
@@ -1956,10 +1958,12 @@ export function ExploreScreen({
               <p className="mt-2 text-[14px] leading-6 text-[#4B5563]">Si te interesa, abres solicitud y continuais la conversacion en privado.</p>
             </article>
           </div>
-        </section>
+        </div>
+      </section>
 
-        <section id="contacto" data-reveal="section" className="section-reveal mt-6 rounded-[30px] border border-[#E7EAF1] bg-[#F7F9FC] p-6 sm:p-8" style={{ boxShadow: CARD_SHADOW }}>
-          <div className="grid gap-7 lg:grid-cols-[1.35fr_0.75fr_1fr]">
+      <section id="contacto" className="w-full bg-[#F7F8FC] px-4 py-14 sm:px-8 lg:py-20">
+        <div className="mx-auto max-w-7xl pr-16 max-sm:pr-0">
+          <div className="grid gap-10 lg:grid-cols-2">
             <div>
               <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#B35C52]">Contacto</p>
               <h2 className="mt-2 text-[28px] font-bold leading-tight text-[#1F2937] sm:text-[34px]">¿Necesitas ayuda para empezar?</h2>
@@ -1983,23 +1987,17 @@ export function ExploreScreen({
               </div>
             </div>
 
-            <div className="space-y-2 text-[16px] font-semibold text-[#0F172A]">
-              <button type="button" onClick={() => smoothScrollToHash("#como-funciona", 160)} className="block text-left transition hover:text-[#FF6B6B]">Como funciona</button>
-              <button type="button" onClick={() => smoothScrollToHash("#top", 0)} className="block text-left transition hover:text-[#FF6B6B]">Volver arriba</button>
-              <Link href="/register" className="block transition hover:text-[#FF6B6B]">Crear cuenta</Link>
-            </div>
-
             <div>
               <p className="text-[14px] font-semibold text-[#111827]">Calle Fray Antonio Alcala 10, 44100 Guadalajara, Jal., Mexico</p>
-              <div className="mt-3 flex gap-2">
+              <div className="mt-4 flex gap-2">
                 {["in", "x", "f", "ig"].map((social) => (
                   <span key={social} className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#111827] text-[12px] font-bold text-white">{social}</span>
                 ))}
               </div>
             </div>
           </div>
-        </section>
-      </div>
+        </div>
+      </section>
 
       <ChatDock
         isAuthenticated={isAuthenticated}

@@ -950,8 +950,8 @@ export function ChatDock({
             setActivePanel("profile");
           }
         }}
-        className="fixed right-0 top-0 z-40 flex h-screen w-16 flex-col items-center justify-start gap-6 border-l border-[#E5E7EB] bg-white pt-20 max-sm:hidden"
-        style={{ boxShadow: "-6px 0 24px rgba(0,0,0,0.08)", marginTop: 24 }}
+        className="fixed right-0 top-0 z-40 flex h-screen w-16 flex-col items-center justify-start gap-6 border-l border-[#E5E7EB] bg-white pt-24 max-sm:hidden"
+        style={{ boxShadow: "-6px 0 24px rgba(0,0,0,0.08)", marginTop: 0 }}
       >
         <div className="flex flex-1 flex-col items-center gap-6">
           {/* Perfil */}
