@@ -995,11 +995,19 @@ export default async function ProfilePage({
   }
 
   const myProfile = me ? firstProfile(me.perfil_convivencia) : null;
-  const targetProfile = firstProfile(target.perfil_convivencia);
-
-  if (!targetProfile) {
-    notFound();
-  }
+  const targetProfile: RawProfile = firstProfile(target.perfil_convivencia) ?? {
+    situacion: "busca_habitacion",
+    estudiaOTrabaja: "Sin especificar",
+    universidad: null,
+    presupuesto: 0,
+    zonas: [target.ciudad ?? ""],
+    fumar: false,
+    mascotas: false,
+    horario: "flexible",
+    ambiente: "equilibrado",
+    deporte: "no_especificado",
+    aficiones: [],
+  };
 
   const score = myProfile ? compatibilityScore(myProfile, targetProfile) : 56;
   const rows = myProfile ? comparisonRows(myProfile, targetProfile) : [];

@@ -526,7 +526,7 @@ function ProfileCard({
 
   return (
     <article
-      className="animate-fade-up relative h-[406px] w-[282px] flex-none overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white"
+      className="animate-fade-up relative flex h-[420px] w-[282px] flex-none flex-col overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white"
       style={{
         boxShadow: CARD_SHADOW,
         animationDelay: `${delay}ms`,
@@ -560,7 +560,8 @@ function ProfileCard({
         </span>
       </div>
 
-      <div className="flex h-[235px] flex-col overflow-y-auto p-4">
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto px-4 pt-4 pb-2">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             {profile.verificado ? (
@@ -578,26 +579,25 @@ function ProfileCard({
             ) : null}
           </div>
           {!isOwner ? (
-            <span className="text-[16px] font-bold text-[#C65A54]">{shortPrice(profile.presupuesto)}</span>
+            <span className="shrink-0 text-[16px] font-bold text-[#C65A54]">{shortPrice(profile.presupuesto)}</span>
           ) : profile.tienePiso && profile.precioPiso ? (
-            <span className="text-[16px] font-bold text-[#C65A54]">{shortPrice(profile.precioPiso)}</span>
+            <span className="shrink-0 text-[16px] font-bold text-[#C65A54]">{shortPrice(profile.precioPiso)}</span>
           ) : null}
         </div>
 
-        <p className="mt-2 truncate text-[14px] font-normal leading-6 text-[#6B7280]">
+        <p className="mt-2 text-[14px] font-normal leading-5 text-[#6B7280]">
           {isOwner ? `Zona ${profile.zona}` : `${profile.situacion.replaceAll("_", " ")} · ${profile.estudiaOTrabaja}`}
         </p>
         <a
           href={profileMapHref(profile)}
           onClick={(event) => event.stopPropagation()}
-          className="mt-1 truncate text-[14px] font-normal leading-6 text-[#4B6B9A] underline-offset-2 transition hover:underline"
-          title={isOwner ? profile.pisoDireccion ?? `${profile.zona}, ${profile.ciudad}` : `${profile.zona}, ${profile.ciudad}`}
+          className="mt-1 block text-[13px] font-normal leading-5 text-[#4B6B9A] underline-offset-2 transition hover:underline"
         >
           {isOwner ? profile.pisoDireccion ?? `${profile.zona}, ${profile.ciudad}` : `${profile.zona}, ${profile.ciudad}`}
         </a>
 
         {isOwner && ownerCompanionCount > 0 ? (
-          <p className="mt-1 truncate text-[13px] font-medium text-[#667085]">Viviras con {ownerCompanionCount} personas mas</p>
+          <p className="mt-1 text-[13px] font-medium text-[#667085]">Viviras con {ownerCompanionCount} personas mas</p>
         ) : null}
 
         {isOwner && profile.companionPhotos.length ? (
@@ -618,11 +618,11 @@ function ProfileCard({
           </div>
         ) : null}
 
-        <div className="mt-3 flex gap-2">
-          {profile.badgeTags.map((tag) => (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {profile.badgeTags.slice(0, 3).map((tag) => (
             <span
               key={`${profile.id}-${tag}`}
-              className="truncate rounded-[999px] bg-[#F3F4F6] px-2 py-1 text-[12px] font-semibold text-[#4B5563]"
+              className="rounded-[999px] bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-semibold text-[#4B5563]"
             >
               {tag}
             </span>
@@ -643,29 +643,29 @@ function ProfileCard({
             </div>
           </div>
         ) : null}
+      </div>
 
-        <div className="mt-auto grid grid-cols-2 gap-2 pt-3">
-          <Link
-            href={`/profile/${profile.id}`}
-            className="inline-flex h-9 items-center justify-center rounded-xl border border-[#D0D5DD] bg-white px-3 text-[12px] font-semibold text-[#1F2937] transition hover:border-[#98A2B3] hover:bg-[#F9FAFB]"
-          >
-            Ver perfil
-          </Link>
-          <button
-            type="button"
-            onClick={() => {
-              if (!isAuthenticated) {
-                onAuthRequired();
-                return;
-              }
-
-              window.location.assign(`/profile/${profile.id}?solicitar=1`);
-            }}
-            className="inline-flex h-9 items-center justify-center rounded-xl bg-[#FF6B6B] px-3 text-[12px] font-semibold text-white transition hover:bg-[#F45C5C]"
-          >
-            Solicitar
-          </button>
-        </div>
+      {/* Fixed buttons always at bottom */}
+      <div className="shrink-0 grid grid-cols-2 gap-2 border-t border-[#F3F4F6] px-4 py-3">
+        <Link
+          href={`/profile/${profile.id}`}
+          className="inline-flex h-9 items-center justify-center rounded-xl border border-[#D0D5DD] bg-white px-3 text-[12px] font-semibold text-[#1F2937] transition hover:border-[#98A2B3] hover:bg-[#F9FAFB]"
+        >
+          Ver perfil
+        </Link>
+        <button
+          type="button"
+          onClick={() => {
+            if (!isAuthenticated) {
+              onAuthRequired();
+              return;
+            }
+            window.location.assign(`/profile/${profile.id}?solicitar=1`);
+          }}
+          className="inline-flex h-9 items-center justify-center rounded-xl bg-[#FF6B6B] px-3 text-[12px] font-semibold text-white transition hover:bg-[#F45C5C]"
+        >
+          Solicitar
+        </button>
       </div>
     </article>
   );
@@ -676,16 +676,42 @@ function ProfileLocationMap({
   city,
   zone,
   name,
+  hasPiso,
+  pisoDireccion,
 }: {
   coordinates: [number, number];
   city: string;
   zone: string;
   name: string;
+  hasPiso: boolean;
+  pisoDireccion?: string | null;
 }) {
   const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapboxMapInstance | null>(null);
   const markerRef = useRef<Marker | null>(null);
+  const [geocodedCenter, setGeocodedCenter] = useState<[number, number] | null>(null);
+  const [geocoding, setGeocoding] = useState(false);
+
+  // If has piso: geocode the real address; fallback to precomputed coordinates
+  useEffect(() => {
+    if (!hasPiso || !token) return;
+    const query = pisoDireccion?.trim() || `${zone}, ${city}`;
+    setGeocoding(true);
+    void fetch(
+      `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?autocomplete=false&types=address,place,locality&language=es&limit=1&access_token=${token}`,
+    )
+      .then((r) => r.json())
+      .then((data: { features?: Array<{ center?: [number, number] }> }) => {
+        const center = data.features?.[0]?.center;
+        if (center && center.length === 2) setGeocodedCenter([center[0], center[1]]);
+        else setGeocodedCenter(coordinates);
+      })
+      .catch(() => setGeocodedCenter(coordinates))
+      .finally(() => setGeocoding(false));
+  }, [hasPiso, pisoDireccion, city, zone, token, coordinates]);
+
+  const activeCoords: [number, number] = hasPiso ? (geocodedCenter ?? coordinates) : coordinates;
 
   useEffect(() => {
     if (!token || !containerRef.current || mapRef.current) {
@@ -706,8 +732,8 @@ function ProfileLocationMap({
       mapRef.current = new mapboxgl.Map({
         container: containerRef.current,
         style: "mapbox://styles/mapbox/streets-v12",
-        center: coordinates,
-        zoom: 12.4,
+        center: activeCoords,
+        zoom: hasPiso ? 15 : 12.4,
       });
 
       mapRef.current.on("load", () => {
@@ -725,7 +751,7 @@ function ProfileLocationMap({
       );
 
       markerRef.current = new mapboxgl.Marker({ color: "#FF6B6B" })
-        .setLngLat(coordinates)
+        .setLngLat(activeCoords)
         .addTo(mapRef.current as MapboxMapInstance);
     })();
 
@@ -736,16 +762,27 @@ function ProfileLocationMap({
       mapRef.current?.remove();
       mapRef.current = null;
     };
-  }, [coordinates, token]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, hasPiso]);
 
   useEffect(() => {
-    if (!mapRef.current) {
-      return;
-    }
+    if (!mapRef.current || !geocodedCenter) return;
+    mapRef.current.flyTo({ center: geocodedCenter, duration: 600, zoom: 15 });
+    markerRef.current?.setLngLat(geocodedCenter);
+  }, [geocodedCenter]);
 
-    mapRef.current.flyTo({ center: coordinates, duration: 600 });
-    markerRef.current?.setLngLat(coordinates);
-  }, [coordinates]);
+  if (!hasPiso) {
+    return (
+      <div className="flex h-full min-h-0 flex-col items-center justify-center gap-2 rounded-2xl bg-[#F8FAFC] px-5 text-center">
+        <svg viewBox="0 0 24 24" className="h-8 w-8 text-[#CBD5E1]" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M21 10c0 6-9 13-9 13S3 16 3 10a9 9 0 0 1 18 0Z" />
+          <circle cx="12" cy="10" r="3" />
+        </svg>
+        <p className="text-[13px] font-semibold text-[#475569]">{name} está buscando piso</p>
+        <p className="text-[12px] text-[#94A3B8]">No tiene ubicación de piso disponible</p>
+      </div>
+    );
+  }
 
   if (!token) {
     return (
@@ -758,10 +795,17 @@ function ProfileLocationMap({
 
   return (
     <div className="relative h-full min-h-0 overflow-hidden rounded-2xl border border-[#D6E4F1] bg-white">
+      {geocoding && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/70">
+          <p className="text-[13px] text-[#6B7280]">Buscando ubicacion...</p>
+        </div>
+      )}
       <div ref={containerRef} className="h-full w-full" />
       <div className="pointer-events-none absolute bottom-3 left-3 right-3 rounded-xl bg-white/90 px-3 py-2 backdrop-blur">
-        <p className="truncate text-[13px] font-semibold text-[#1A1A1A]">Zona aproximada de {name}</p>
-        <p className="truncate text-[12px] text-[#6B7280]">{zone}, {city}</p>
+        <p className="truncate text-[13px] font-semibold text-[#1A1A1A]">
+          {pisoDireccion?.trim() ? `📍 ${pisoDireccion.trim()}` : `Zona aproximada · ${zone}, ${city}`}
+        </p>
+        <p className="truncate text-[12px] text-[#6B7280]">{city}</p>
       </div>
     </div>
   );
@@ -850,8 +894,6 @@ function ProfileExpandedModal({
           <div className="grid min-h-[260px] grid-rows-2 gap-3 p-3 sm:min-h-[620px] sm:p-4">
             <div className="relative h-full overflow-hidden rounded-2xl border border-[#D6E4F1] bg-white">
               <img src={withFallbackImage(profile.fotoUrl)} alt={profile.nombre} className="h-full w-full object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#06152D]/68 via-[#06152D]/15 to-transparent" />
-
               <button
                 type="button"
                 onClick={onClose}
@@ -864,14 +906,15 @@ function ProfileExpandedModal({
                 </svg>
               </button>
 
-              <div className="absolute bottom-4 left-4 right-4">
-                <div className="inline-flex rounded-full border border-white/40 bg-white/22 px-3 py-1 text-[13px] font-semibold text-white backdrop-blur">
+              <div className="absolute bottom-0 left-0 right-0 rounded-b-2xl bg-white px-4 py-3">
+                <div className="inline-flex rounded-full border border-[#E5E7EB] bg-[#F3F4F6] px-3 py-1 text-[13px] font-semibold text-[#374151]">
                   Compatibilidad {profile.compatibilidad}%
                 </div>
-                <h3 className="mt-2 text-[34px] font-black tracking-tight text-white">{profile.nombre}, {profile.edad}</h3>
-                <p className="text-[14px] font-medium text-white/85">{profile.zona}, {profile.ciudad}</p>
+                <h3 className="mt-1.5 text-[26px] font-black tracking-tight text-[#111827]">{profile.nombre}, {profile.edad}</h3>
+                <p className="text-[13px] font-medium text-[#4B5563]">{profile.zona}, {profile.ciudad}</p>
+                <p className="text-[13px] text-[#6B7280]">{profile.estudiaOTrabaja}</p>
                 {profile.esErasmus ? (
-                  <span className="mt-2 inline-flex rounded-full border border-white/40 bg-white/20 px-2.5 py-1 text-[12px] font-semibold text-white">
+                  <span className="mt-1.5 inline-flex rounded-full border border-[#E5E7EB] bg-[#EEF2FF] px-2.5 py-0.5 text-[12px] font-semibold text-[#4338CA]">
                     Erasmus
                   </span>
                 ) : null}
@@ -884,6 +927,8 @@ function ProfileExpandedModal({
                 city={profile.ciudad}
                 zone={profile.zona}
                 name={profile.nombre}
+                hasPiso={profile.tienePiso}
+                pisoDireccion={profile.pisoDireccion}
               />
             </div>
           </div>
