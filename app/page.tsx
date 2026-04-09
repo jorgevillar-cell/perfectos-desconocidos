@@ -84,6 +84,46 @@ function normalizeForSearch(value: string) {
 
 export default function Home() {
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+  // Contact form state
+  const [contactNombre, setContactNombre] = useState("");
+  const [contactApellido, setContactApellido] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactMensaje, setContactMensaje] = useState("");
+  const [contactLoading, setContactLoading] = useState(false);
+  const [contactEnviado, setContactEnviado] = useState(false);
+  const [contactError, setContactError] = useState(false);
+
+  async function handleContactSubmit() {
+    setContactLoading(true);
+    setContactEnviado(false);
+    setContactError(false);
+    try {
+      const res = await fetch("/api/contacto", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nombre: contactNombre,
+          apellido: contactApellido,
+          email: contactEmail,
+          mensaje: contactMensaje,
+        }),
+      });
+      if (res.ok) {
+        setContactEnviado(true);
+        setContactNombre("");
+        setContactApellido("");
+        setContactEmail("");
+        setContactMensaje("");
+      } else {
+        setContactError(true);
+      }
+    } catch {
+      setContactError(true);
+    } finally {
+      setContactLoading(false);
+    }
+  }
+
   const [cityQuery, setCityQuery] = useState("");
   const [citySuggestions, setCitySuggestions] = useState<CitySuggestion[]>([]);
   const [cityMenuOpen, setCityMenuOpen] = useState(false);
@@ -351,7 +391,7 @@ export default function Home() {
 
             <div className="mt-8 space-y-2 text-[18px] text-[#2F3560]">
               <p>Calle Fray Antonio Alcala 10, 44100 Guadalajara, Jal., Mexico</p>
-              <p>hola@perfectosdesconocidos.app</p>
+              <p>perfectossdesconocidoss@gmail.com</p>
               <p>Telefono: +34 911 00 00 00</p>
             </div>
 
@@ -363,12 +403,14 @@ export default function Home() {
           </div>
 
           {/* Form */}
-          <form className="grid gap-6 self-start">
+          <div className="grid gap-6 self-start">
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="text-[15px] font-medium text-[#2E3560]">
                 Nombre *
                 <input
                   type="text"
+                  value={contactNombre}
+                  onChange={(e) => setContactNombre(e.target.value)}
                   className="mt-3 h-10 w-full border-0 border-b border-[#AAB1D1] bg-transparent px-0 text-[15px] text-[#111827] outline-none focus:border-[#8B4CF6]"
                 />
               </label>
@@ -376,6 +418,8 @@ export default function Home() {
                 Apellido *
                 <input
                   type="text"
+                  value={contactApellido}
+                  onChange={(e) => setContactApellido(e.target.value)}
                   className="mt-3 h-10 w-full border-0 border-b border-[#AAB1D1] bg-transparent px-0 text-[15px] text-[#111827] outline-none focus:border-[#8B4CF6]"
                 />
               </label>
@@ -385,6 +429,8 @@ export default function Home() {
               Email *
               <input
                 type="email"
+                value={contactEmail}
+                onChange={(e) => setContactEmail(e.target.value)}
                 className="mt-3 h-10 w-full border-0 border-b border-[#AAB1D1] bg-transparent px-0 text-[15px] text-[#111827] outline-none focus:border-[#8B4CF6]"
               />
             </label>
@@ -393,19 +439,30 @@ export default function Home() {
               Déjanos un mensaje...
               <textarea
                 rows={4}
+                value={contactMensaje}
+                onChange={(e) => setContactMensaje(e.target.value)}
                 className="mt-3 w-full resize-none border-0 border-b border-[#AAB1D1] bg-transparent px-0 py-1 text-[15px] text-[#111827] outline-none focus:border-[#8B4CF6]"
               />
             </label>
 
+            {contactEnviado && (
+              <p className="text-[14px] font-semibold text-green-600">¡Mensaje enviado! Te responderemos pronto.</p>
+            )}
+            {contactError && (
+              <p className="text-[14px] font-semibold text-red-600">Error al enviar. Inténtalo de nuevo.</p>
+            )}
+
             <div>
               <button
                 type="button"
-                className="inline-flex min-h-12 min-w-40 items-center justify-center rounded-xl bg-[linear-gradient(90deg,#9A4BFF_0%,#7E3AF2_100%)] px-8 text-[16px] font-semibold text-white shadow-[0_8px_24px_rgba(126,58,242,0.30)] transition hover:opacity-90"
+                disabled={contactLoading}
+                onClick={handleContactSubmit}
+                className="inline-flex min-h-12 min-w-40 items-center justify-center rounded-xl bg-[linear-gradient(90deg,#9A4BFF_0%,#7E3AF2_100%)] px-8 text-[16px] font-semibold text-white shadow-[0_8px_24px_rgba(126,58,242,0.30)] transition hover:opacity-90 disabled:opacity-60"
               >
-                Enviar
+                {contactLoading ? "Enviando..." : "Enviar"}
               </button>
             </div>
-          </form>
+          </div>
         </div>
       </section>
     </main>

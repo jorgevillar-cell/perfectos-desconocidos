@@ -1335,6 +1335,46 @@ export function ExploreScreen({
   const cityPickerRef = useRef<HTMLDivElement | null>(null);
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
+  // Contact form state
+  const [contactNombre, setContactNombre] = useState("");
+  const [contactApellido, setContactApellido] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactMensaje, setContactMensaje] = useState("");
+  const [contactLoading, setContactLoading] = useState(false);
+  const [contactEnviado, setContactEnviado] = useState(false);
+  const [contactError, setContactError] = useState(false);
+
+  async function handleContactSubmit() {
+    setContactLoading(true);
+    setContactEnviado(false);
+    setContactError(false);
+    try {
+      const res = await fetch("/api/contacto", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nombre: contactNombre,
+          apellido: contactApellido,
+          email: contactEmail,
+          mensaje: contactMensaje,
+        }),
+      });
+      if (res.ok) {
+        setContactEnviado(true);
+        setContactNombre("");
+        setContactApellido("");
+        setContactEmail("");
+        setContactMensaje("");
+      } else {
+        setContactError(true);
+      }
+    } catch {
+      setContactError(true);
+    } finally {
+      setContactLoading(false);
+    }
+  }
+
   const hasActiveFiltering =
     Boolean(selectedCity) ||
     Object.values(filters).some(Boolean) ||
@@ -1961,39 +2001,88 @@ export function ExploreScreen({
         </div>
       </section>
 
-      <section id="contacto" className="w-full bg-[#F7F8FC] px-4 py-14 sm:px-8 lg:py-20">
-        <div className="mx-auto max-w-7xl pr-16 max-sm:pr-0">
-          <div className="grid gap-10 lg:grid-cols-2">
-            <div>
-              <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#B35C52]">Contacto</p>
-              <h2 className="mt-2 text-[28px] font-bold leading-tight text-[#1F2937] sm:text-[34px]">¿Necesitas ayuda para empezar?</h2>
-              <p className="mt-2 text-[14px] leading-7 text-[#6B7280]">
-                Escríbenos y te guiamos con el alta del perfil, filtros y primeras solicitudes.
-              </p>
+      <section id="contacto" className="w-full bg-[#F7F8FC] px-4 py-16 sm:px-8 lg:py-24">
+        <div className="mx-auto max-w-7xl pr-16 max-sm:pr-0 grid gap-12 lg:grid-cols-2">
+          {/* Info */}
+          <div>
+            <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#8B4CF6]">Contacto</p>
+            <h2 className="mt-3 text-[42px] font-bold leading-[1.05] text-[#1A1F55] sm:text-[56px]">Hagamos match con tu nuevo hogar</h2>
+            <p className="mt-5 max-w-lg text-[17px] leading-8 text-[#2E355F]">
+              Cuéntanos tu situación y te ayudamos a encontrar un piso y una convivencia que de verdad encaje contigo.
+            </p>
 
-              <div className="mt-5 flex flex-wrap gap-3">
-                <a
-                  href="mailto:hola@perfectosdesconocidos.app"
-                  className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#FF6B6B] px-5 text-[14px] font-semibold text-white transition hover:bg-[#F45C5C]"
-                >
-                  hola@perfectosdesconocidos.app
-                </a>
-                <a
-                  href="tel:+34911000000"
-                  className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[#D8DEE8] bg-white px-5 text-[14px] font-semibold text-[#1F2937]"
-                >
-                  +34 911 00 00 00
-                </a>
-              </div>
+            <div className="mt-8 space-y-2 text-[18px] text-[#2F3560]">
+              <p>Calle Fray Antonio Alcala 10, 44100 Guadalajara, Jal., Mexico</p>
+              <p>perfectossdesconocidoss@gmail.com</p>
+              <p>Telefono: +34 911 00 00 00</p>
             </div>
 
+            <div className="mt-8 flex items-center gap-3 text-[#0F172A]">
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#111827]/20 bg-white text-[22px] font-semibold">in</span>
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#111827]/20 bg-white text-[22px] font-semibold">f</span>
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#111827]/20 bg-white text-[22px] font-semibold">x</span>
+            </div>
+          </div>
+
+          {/* Form */}
+          <div className="grid gap-6 self-start">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="text-[15px] font-medium text-[#2E3560]">
+                Nombre *
+                <input
+                  type="text"
+                  value={contactNombre}
+                  onChange={(e) => setContactNombre(e.target.value)}
+                  className="mt-3 h-10 w-full border-0 border-b border-[#AAB1D1] bg-transparent px-0 text-[15px] text-[#111827] outline-none focus:border-[#8B4CF6]"
+                />
+              </label>
+              <label className="text-[15px] font-medium text-[#2E3560]">
+                Apellido *
+                <input
+                  type="text"
+                  value={contactApellido}
+                  onChange={(e) => setContactApellido(e.target.value)}
+                  className="mt-3 h-10 w-full border-0 border-b border-[#AAB1D1] bg-transparent px-0 text-[15px] text-[#111827] outline-none focus:border-[#8B4CF6]"
+                />
+              </label>
+            </div>
+
+            <label className="text-[15px] font-medium text-[#2E3560]">
+              Email *
+              <input
+                type="email"
+                value={contactEmail}
+                onChange={(e) => setContactEmail(e.target.value)}
+                className="mt-3 h-10 w-full border-0 border-b border-[#AAB1D1] bg-transparent px-0 text-[15px] text-[#111827] outline-none focus:border-[#8B4CF6]"
+              />
+            </label>
+
+            <label className="text-[15px] font-medium text-[#2E3560]">
+              Déjanos un mensaje...
+              <textarea
+                rows={4}
+                value={contactMensaje}
+                onChange={(e) => setContactMensaje(e.target.value)}
+                className="mt-3 w-full resize-none border-0 border-b border-[#AAB1D1] bg-transparent px-0 py-1 text-[15px] text-[#111827] outline-none focus:border-[#8B4CF6]"
+              />
+            </label>
+
+            {contactEnviado && (
+              <p className="text-[14px] font-semibold text-green-600">¡Mensaje enviado! Te responderemos pronto.</p>
+            )}
+            {contactError && (
+              <p className="text-[14px] font-semibold text-red-600">Error al enviar. Inténtalo de nuevo.</p>
+            )}
+
             <div>
-              <p className="text-[14px] font-semibold text-[#111827]">Calle Fray Antonio Alcala 10, 44100 Guadalajara, Jal., Mexico</p>
-              <div className="mt-4 flex gap-2">
-                {["in", "x", "f", "ig"].map((social) => (
-                  <span key={social} className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#111827] text-[12px] font-bold text-white">{social}</span>
-                ))}
-              </div>
+              <button
+                type="button"
+                disabled={contactLoading}
+                onClick={handleContactSubmit}
+                className="inline-flex min-h-12 min-w-40 items-center justify-center rounded-xl bg-[linear-gradient(90deg,#9A4BFF_0%,#7E3AF2_100%)] px-8 text-[16px] font-semibold text-white shadow-[0_8px_24px_rgba(126,58,242,0.30)] transition hover:opacity-90 disabled:opacity-60"
+              >
+                {contactLoading ? "Enviando..." : "Enviar"}
+              </button>
             </div>
           </div>
         </div>

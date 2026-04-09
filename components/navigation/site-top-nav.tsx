@@ -10,6 +10,7 @@ type SessionUser = {
   id: string;
   name: string;
   email: string;
+  fotoUrl: string | null;
 };
 
 type SiteTopNavProps = {
@@ -106,9 +107,17 @@ export function SiteTopNav({ currentPath }: SiteTopNavProps) {
                 href={`/profile/${user.id}`}
                 className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#D8DEE8] bg-white px-3 text-[14px] font-semibold text-[#374151] transition hover:bg-[#F9FAFB]"
               >
-                <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-[#FFE8E4] text-[12px] font-bold text-[#B35C52]">
-                  {initials(user.name) || "U"}
-                </span>
+                {user.fotoUrl ? (
+                  <img
+                    src={user.fotoUrl}
+                    alt={user.name}
+                    className="h-7 w-7 rounded-full object-cover"
+                  />
+                ) : (
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-[#FFE8E4] text-[12px] font-bold text-[#B35C52]">
+                    {initials(user.name) || "U"}
+                  </span>
+                )}
                 {user.name}
               </Link>
             ) : (

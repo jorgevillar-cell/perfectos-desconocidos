@@ -41,9 +41,9 @@ export async function GET(request: Request) {
   if (!full) {
     const { data: userRow } = await supabase
       .from("users")
-      .select("id,nombre,email")
+      .select("id,nombre,email,fotoUrl")
       .eq("id", user.id)
-      .maybeSingle<{ id: string; nombre: string | null; email: string | null }>();
+      .maybeSingle<{ id: string; nombre: string | null; email: string | null; fotoUrl: string | null }>();
 
     const fallbackName = user.email?.split("@")[0] ?? "Usuario";
 
@@ -53,6 +53,7 @@ export async function GET(request: Request) {
         id: user.id,
         name: userRow?.nombre?.trim() || fallbackName,
         email: user.email ?? userRow?.email ?? "",
+        fotoUrl: userRow?.fotoUrl ?? null,
       },
     });
   }

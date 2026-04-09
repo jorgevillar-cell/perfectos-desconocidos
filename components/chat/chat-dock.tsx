@@ -178,6 +178,7 @@ export function ChatDock({
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [deleteAccountError, setDeleteAccountError] = useState("");
   const [isGuestMenuOpen, setIsGuestMenuOpen] = useState(false);
+  const [fotoUrl, setFotoUrl] = useState<string | null>(null);
 
   const panelRef = useRef<HTMLDivElement | null>(null);
   const sidebarRef = useRef<HTMLDivElement | null>(null);
@@ -485,6 +486,18 @@ export function ChatDock({
   const handleRequestCountChange = useCallback((count: number) => {
     setRequestBadgeCount(count);
   }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated || !currentUserId) return;
+    void fetch("/api/profile/me", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((data: { authenticated?: boolean; user?: { fotoUrl?: string | null } }) => {
+        if (data.authenticated && data.user?.fotoUrl) {
+          setFotoUrl(data.user.fotoUrl);
+        }
+      })
+      .catch(() => undefined);
+  }, [isAuthenticated, currentUserId]);
 
   useEffect(() => {
     function readSavedCount() {
@@ -961,12 +974,18 @@ export function ChatDock({
               onClick={() => togglePanel("profile")}
               className={`flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border text-[15px] font-bold transition ${
                 activePanel === "profile"
-                  ? "border-[#FF6B6B] bg-[#FF6B6B]/10 text-[#FF6B6B]"
-                  : "border-[#E5E7EB] bg-[#FFF5F5] text-[#FF6B6B] hover:border-[#FF6B6B]/35"
+                  ? "border-[#FF6B6B]"
+                  : "border-[#E5E7EB] hover:border-[#FF6B6B]/35"
               }`}
               aria-label="Perfil"
             >
-              {avatarLabel || "U"}
+              {fotoUrl ? (
+                <img src={fotoUrl} alt={currentUserName} className="h-full w-full object-cover" />
+              ) : (
+                <span className={activePanel === "profile" ? "text-[#FF6B6B]" : "text-[#FF6B6B]"}>
+                  {avatarLabel || "U"}
+                </span>
+              )}
             </button>
             <span className="text-[11px] text-[#7A8494] mt-1">Perfil</span>
           </div>
@@ -1070,7 +1089,11 @@ export function ChatDock({
           </MobileDockButton>
 
           <MobileDockButton active={activePanel === "profile"} label="Perfil" onClick={() => togglePanel("profile")}>
-            <span className="text-[14px] font-bold">{avatarLabel || "U"}</span>
+            {fotoUrl ? (
+              <img src={fotoUrl} alt={currentUserName} className="h-7 w-7 rounded-full object-cover" />
+            ) : (
+              <span className="text-[14px] font-bold">{avatarLabel || "U"}</span>
+            )}
           </MobileDockButton>
         </div>
       </nav>

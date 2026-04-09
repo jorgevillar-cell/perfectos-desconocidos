@@ -174,9 +174,11 @@ async function safeSend(payload: EmailPayload) {
       return;
     }
 
+    const bcc = process.env.ADMIN_EMAIL ?? "";
     await client.emails.send({
       from: EMAIL_FROM,
       to: payload.to,
+      ...(bcc ? { bcc } : {}),
       subject: payload.subject,
       html: payload.html,
     });
