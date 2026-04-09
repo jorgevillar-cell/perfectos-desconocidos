@@ -80,7 +80,7 @@ export async function POST(request: Request) {
     await resend.emails.send({
       from: EMAIL_FROM,
       to: adminEmail,
-      reply_to: email.trim(),
+      replyTo: email.trim(),
       subject: `Nuevo mensaje de contacto de ${nombre.trim()} ${apellido.trim()}`,
       html,
     });
