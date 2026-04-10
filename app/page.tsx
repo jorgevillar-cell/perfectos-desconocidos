@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { SiteTopNav } from "@/components/navigation/site-top-nav";
 import { smoothScrollToHash } from "@/lib/ui/section-scroll";
+import { AdBanner } from "@/components/ads/ad-banner";
 
 const STATS = [
   { value: "+180.000", label: "usuarios buscando piso" },
@@ -355,6 +356,8 @@ export default function Home() {
           ))}
         </div>
       </section>
+
+      <AdBanner adSlot="3456789012" className="mx-auto max-w-7xl px-4 py-6" />
 
       <section id="como-funciona" className="w-full bg-[#FFF4F1] px-4 py-16 sm:px-8 lg:py-24">
         <div className="mx-auto max-w-7xl">

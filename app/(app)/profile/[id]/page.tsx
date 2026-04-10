@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { ProfileLocationMap } from "@/components/profile/profile-location-map";
 import { RequestContactButton } from "@/components/profile/request-contact-button";
 import { SaveProfileButton } from "@/components/profile/save-profile-button";
+import { AdBanner } from "@/components/ads/ad-banner";
 import { getDemoProfiles } from "@/lib/explore/demo-profiles";
 import { getCurrentUser } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -1093,6 +1094,7 @@ export default async function ProfilePage({
               zones={targetProfile.zonas ?? []}
             />
             <ListingDescription title="Sobre mi" text={target.bio?.trim() || descriptionText} />
+            <AdBanner adSlot="2345678901" className="mt-4 rounded-2xl" />
             <LivingStyleGrid profile={targetProfile} />
             {isOwner && hasCompanions ? <LivingWithSection companions={companions} /> : null}
             <CompatibilitySection score={score} rows={rows} companionCompatibilityRows={isOwner && hasCompanions ? companionRows : []} />

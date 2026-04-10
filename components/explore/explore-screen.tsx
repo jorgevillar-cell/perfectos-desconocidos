@@ -7,6 +7,7 @@ import { ChatDock } from "@/components/chat/chat-dock";
 import { SiteTopNav } from "@/components/navigation/site-top-nav";
 import type { MatchCelebrationPayload } from "@/lib/chat/types";
 import { smoothScrollToHash } from "@/lib/ui/section-scroll";
+import { AdBanner } from "@/components/ads/ad-banner";
 
 export type ExploreProfile = {
   id: string;
@@ -1992,6 +1993,8 @@ export function ExploreScreen({
             <EmptyState />
           )}
         </section>
+
+        <AdBanner adSlot="1234567890" className="my-6 rounded-2xl" />
 
         <section className="mt-8">
           <SectionTitle title="Otros perfiles en tu ciudad" count={others.length} />
